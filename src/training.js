@@ -12,7 +12,7 @@ import { burst, centre } from './juice.js'
 // anywhere (also mid-race). Both are times the train boost (boosts.js). Gains
 // are whole bolts (fractions carry over) handed to onGain(n), which adds them to
 // the rebirth energy = the HUD's bolt counter = race speed (main.js).
-// Feedback: a "+N" bolt floats off the boat and the bolt counter bumps; driving
+// Feedback: a "+N" bolt floats off the horse and the bolt counter bumps; riding
 // onto a locked lane says what it needs; a lane unlocking says so.
 // hud: { root, getStat }. plaza: { lanes, setUnlocked }.
 export function createTraining({ hud, plaza, onGain }) {

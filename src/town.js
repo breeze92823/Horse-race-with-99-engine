@@ -1,5 +1,5 @@
 import { BoxGeometry, CanvasTexture, CapsuleGeometry, ConeGeometry, CylinderGeometry, Group, MeshStandardMaterial, PlaneGeometry, SRGBColorSpace } from 'three'
-import { BEACH, ISLET, LOBBY, PLAZA, TOWN, WATER } from './config.js'
+import { GROUND, HILL, LOBBY, PLAZA, TOWN, YARD } from './config.js'
 import { bake } from './bake.js'
 import { buildCliff, fontReady, neon, put, std } from './propkit.js'
 import { mulberry32, paintDirt, paintPlanks, paintText, toTexture } from './textures.js'
@@ -121,7 +121,7 @@ function buildMesas(root) {
     const x = Math.cos(a) * dist
     const z = Math.sin(a) * dist
     if (z < 0 && Math.abs(x) < 130) continue // the race track
-    buildCliff(g, [x, z, lerp(S.width, rand()), lerp(S.width, rand()) * 0.6, lerp(S.height, rand() * rand()), rand() * Math.PI], 900 + placed, WATER.level - 1, false, TOWN.rock)
+    buildCliff(g, [x, z, lerp(S.width, rand()), lerp(S.width, rand()) * 0.6, lerp(S.height, rand() * rand()), rand() * Math.PI], 900 + placed, GROUND.sunk, false, TOWN.rock)
     placed++
   }
   root.add(bake(g))
@@ -202,7 +202,7 @@ export function buildTown(root) {
   const m = materials()
 
   // Desert sand on the same slab.
-  const top = new MeshStandardMaterial({ map: toTexture(paintDirt(256, 909, ...TOWN.sand), { repeat: 1 / BEACH.dirtTile, srgb: true }), roughness: 1 })
+  const top = new MeshStandardMaterial({ map: toTexture(paintDirt(256, 909, ...TOWN.sand), { repeat: 1 / YARD.dirtTile, srgb: true }), roughness: 1 })
   buildSlab(root, top, TOWN.side)
 
   // Buttes on the tall footprints, storefronts on the low ones.
@@ -217,7 +217,7 @@ export function buildTown(root) {
   buildMesas(root)
 
   // The hill, dry, with the water tower on top.
-  const I = ISLET
+  const I = HILL
   root.add(...makeHill(I.x, I.z, I.hill.rx, I.hill.ry, I.hill.rz, '#b5a25a', 14))
   const tower = new Group()
   waterTower(tower, I.x, hillTop(0, 0) - 0.5, I.z)

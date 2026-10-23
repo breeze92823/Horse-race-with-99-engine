@@ -8,7 +8,7 @@
 // never crafted or deleted). Delete mode: taps mark pets, the footer turns into
 // Cancel / Delete (n). Craft All turns every PETS.craftCount identical pets into
 // one of the next tier. State is saved by the server (snapshot / hydrate, net.js).
-// The shell is uiWindow.js (shared with Rebirth / Boats); pets.css only styles the contents.
+// The shell is uiWindow.js (shared with Rebirth / Horses); pets.css only styles the contents.
 import { PETS } from './config.js'
 import { createWindow, replay, uiButton } from './uiWindow.js'
 import './pets.css' // after the shell's CSS

@@ -1,7 +1,7 @@
 /* Training feedback (training.js). Lives inside .hud: --u, --tap, --st and the
    outlined/gradient text classes come from hud.css. */
 
-/* "+N" bolt floating up off the boat. */
+/* "+N" bolt floating up off the horse. */
 .train-pop {
   position: absolute;
   display: flex;

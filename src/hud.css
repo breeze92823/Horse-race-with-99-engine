@@ -802,7 +802,7 @@
 }
 
 /* Podium on touch: small medals without ribbons, up in the free middle of the top row
-   (in landscape it hung right over the boat). */
+   (in landscape it hung right over the horse). */
 .touch-ui .hud .hud-podium {
   --m: 32px;
   gap: 8px;

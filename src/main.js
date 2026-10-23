@@ -47,12 +47,12 @@ import { applyProportions, attachEquippedAccessories } from './avatar/loader.js'
 import { disposeAnimator, makeAnimator } from './avatar/animator.js'
 
 // Boot order: Bloxity SDK -> renderer -> Rapier (async
-// wasm) -> world, lobby + plaza + shop props, lighting, player body + boat -> avatar (async, swaps in
+// wasm) -> world, lobby + plaza + shop props, lighting, player body + horse -> avatar (async, swaps in
 // when ready) -> loop. The SDK is optional at every step.
 let lighting = null
 let renderer = null
 let postfx = null
-let trailsScene = null // made once the boat exists; Esc leaves it first
+let trailsScene = null // made once the horse exists; Esc leaves it first
 
 // Settings come from the portal's settings menu (or their defaults offline).
 function applySetting(key, value) {
@@ -107,14 +107,14 @@ bloxity.loadingStep('Starting physics')
 await initPhysics()
 
 lighting = createLighting(scene, renderer, preset)
-const world = createWorld(scene) // the sea and clouds, shared by every world
+const world = createWorld(scene) // the ground to the horizon and the clouds, shared by every world
 const homeFrom = scene.children.length
-// The scenery of each world (beach / City): one Group each, built when first shown (worlds.js).
+// The scenery of each world (ranch / Frontier Town): one Group each, built when first shown (worlds.js).
 const env = createEnvironment(scene)
 const lobby = createLobby(scene)
 const plaza = createPlaza(scene)
 const shops = createShops(scene)
-// Everything on the start island; a race slides it away behind the boat (race.js / raceScenery.js).
+// Everything on the start island; a race slides it away behind the horse (race.js / raceScenery.js).
 const home = scene.children.slice(homeFrom)
 createPlayerBody()
 syncYawToPlayer()
@@ -210,7 +210,7 @@ hud = createHud({
   engine: () => engineWindow.open(),
   horses: () => horsesWindow.open(),
   partner: () => partnerWindow.open(),
-  trail: () => race.isRacing() || trailsScene.open(), // the Trails scene would park the boat mid-race
+  trail: () => race.isRacing() || trailsScene.open(), // the Trails scene would park the horse mid-race
   autoRace: (on) => {
     autoRace = on
     if (on) race.start()
@@ -278,8 +278,8 @@ const dailyWindow = createDaily({
   onReadyCount: (n) => hud.setDailyReady(n),
   canAutoOpen: () => !race.isRacing() && !trailsScene.isOpen() && !eggs.hatching,
 })
-// Trails scene: the HUD folds down, the world pauses and the boat is shown off
-// at sea (stage() in the loop); tapping a trail previews it on the boat. Trails are bought with Wins.
+// Trails scene: the HUD folds down, the world pauses and the horse gallops in place
+// on the meadow (stage() in the loop); tapping a trail previews it on the horse. Trails are bought with Wins.
 trailsScene = createTrails({
   wallet: { wins: () => hud.getStat('wins'), spend: (n) => rebirthWindow.addEnergy(-n) },
   rebirths: () => rebirthState.rebirths,
@@ -299,7 +299,7 @@ trailsScene = createTrails({
 trail.set(trailById(trailState.equipped))
 onKey('KeyL', () => race.isRacing() || trailsScene.toggle())
 
-// The race: through the START gate (or AUTO RACE) the boat drives itself down the lane.
+// The race: through the START gate (or AUTO RACE) the horse gallops itself down the track.
 let autoRace = false
 const race = createRace({
   scene,
@@ -319,7 +319,7 @@ const race = createRace({
 const training = createTraining({ hud, plaza, onGain: (n) => rebirthWindow.addEnergy(n) })
 
 // Worlds: the plaza's VIP portal goes to the City (10 rebirths + 200 Power) and back. Same island,
-// shops and progress; the scenery, sea and sky change. A race or the Trails scene ends first.
+// shops and progress; the scenery, ground and sky change. A race or the Trails scene ends first.
 const worlds = createWorlds({
   hud,
   plaza,
@@ -334,22 +334,22 @@ const worlds = createWorlds({
   respawn,
 })
 
-// Hub pads in front of the Eggs stall, Boats stall, Engine Upgrade machine and hero statues open their windows.
+// Hub pads in front of the Eggs stall, Horses stall, Engine Upgrade machine and hero statues open their windows.
 const hubWindows = { pets: petsWindow.open, horses: horsesWindow.open, engine: engineWindow.open, partner: partnerWindow.open }
 const hubFrom = scene.children.length
 const hub = createHub(scene, hubWindows)
 home.push(...scene.children.slice(hubFrom)) // the pads are on the island too
 // The egg window (E at a stall egg): odds, Open 1 / 3, Auto, the hatch overlay; it takes E / R / T while open.
 const eggs = createEggs({ hud, pets: petsWindow, spots: shops.spots.eggs })
-// E prompts on the shop objects: open an egg, buy/equip boats, engines and partners in the world.
+// E prompts on the shop objects: open an egg, buy/equip horses, engines and partners in the world.
 const interact = createInteract({ hud, lobby, shops, eggs, horses: horsesWindow, engine: engineWindow, partner: partnerWindow, windows: hubWindows })
 // E interacts with the object in front of you; with none in range it toggles the Engine window as before.
 onKey('KeyE', () => interact.trigger() || engineWindow.toggle())
 
 // --- Presence: gear in the world, this player for the others, the others for this player ---
 // (made after the start island's objects, so none of this slides away with it during a race)
-// The equipped pets hover round the boat, the partner stands behind the rider and the engines take
-// the equipped engine's colours x the boat's engine count. Polled: any window may change the gear.
+// The equipped pets hover round the horse, the partner stands behind the rider and the boosters
+// take the equipped engine's colours x the horse's booster count. Polled: any window may change the gear.
 const companions = createCompanions(scene, horse.seat, { shadows: true })
 const engineLooks = new Map(ENGINES.map((e) => [e.id, e.look]))
 const horseEngines = new Map(HORSES.list.map((h) => [h.id, h.engines]))
@@ -378,7 +378,7 @@ function syncGear() {
 }
 syncGear()
 setInterval(syncGear, 250)
-// Everyone else in the room, with their boats, engines, trails, pets and partners (remotePlayers.js).
+// Everyone else in the room, with their horses, engines, trails, pets and partners (remotePlayers.js).
 const remotes = createRemotePlayers(scene)
 const round = (n) => Math.round(n * 100) / 100
 
@@ -402,12 +402,12 @@ renderer.setAnimationLoop(() => {
   const dt = Math.min(clock.getDelta(), 0.1) // clamp huge frames (tab switch, breakpoint)
   const elapsed = clock.elapsedTime
 
-  const staging = trailsScene.isOpen() // the Trails scene pauses the world and parks the boat at sea
+  const staging = trailsScene.isOpen() // the Trails scene pauses the world and parks the horse on the meadow
   if (!staging) stepPhysics(dt) // runs the player controller + world at the fixed rate, interpolates bodies
   interpolatePlayer()
   if (!staging && !race.isRacing() && race.atGate(player.position)) race.start()
   const racing = race.isRacing()
-  const scroll = race.update(dt) // m/s the world slides past a cruising boat (0 when not racing)
+  const scroll = race.update(dt) // m/s the world slides past a galloping horse (0 when not racing)
 
   const p = player.renderPosition
   playerGroup.position.set(p.x, p.y, p.z)
@@ -419,10 +419,10 @@ renderer.setAnimationLoop(() => {
     horse.update(dt, TRAILS.showcase.speed, 0, elapsed)
     animator?.update(dt, { grounded: true, speed: TRAILS.showcase.speed, verticalVelocity: 0, turn: 0, riding: true })
   } else if (racing) {
-    playerGroup.visible = true // the boat stays in view; in first person only the rider is hidden
+    playerGroup.visible = true // the horse stays in view; in first person only the rider is hidden
     horse.rider.visible = getMode() !== 'player'
-    horse.update(dt, race.boatSpeed(), inputState.move.x, elapsed, race.tapBoost())
-    animator?.update(dt, { grounded: true, speed: race.boatSpeed(), verticalVelocity: 0, turn: 0, riding: true })
+    horse.update(dt, race.horseSpeed(), inputState.move.x, elapsed, race.tapBoost())
+    animator?.update(dt, { grounded: true, speed: race.horseSpeed(), verticalVelocity: 0, turn: 0, riding: true })
   } else if (getMode() === 'character') {
     horse.update(dt, speed, inputState.move.x, elapsed, 0, player.grounded, player.velocity.y)
     // Riding: the avatar sits in the saddle; the horse walks, gallops and jumps under it.
@@ -431,11 +431,11 @@ renderer.setAnimationLoop(() => {
 
   if (racing) race.camera(camera, dt)
   else if (!staging) updateCamera(camera, dt)
-  // Engine, hull and beach ambience follow the boat and the camera.
+  // Hooves, boosters and the countryside ambience follow the horse and the camera.
   updateAudio(dt, {
     camera,
     player: { x: player.position.x, y: player.position.y, z: player.position.z, vy: player.velocity.y, grounded: player.grounded },
-    speed: staging ? TRAILS.showcase.speed : racing ? race.boatSpeed() : speed,
+    speed: staging ? TRAILS.showcase.speed : racing ? race.horseSpeed() : speed,
     top: racing ? race.topSpeed() : staging ? TRAILS.showcase.speed * 1.6 : PHYSICS.sprintSpeed,
     boost: racing ? race.tapBoost() : 0,
     moving: Math.min(1, Math.hypot(inputState.move.x, inputState.move.z)),
@@ -456,7 +456,7 @@ renderer.setAnimationLoop(() => {
   updateCompanionMaterials(elapsed)
   // This player for the others, in track coordinates (the real position, not the Trails showcase).
   const track = race.trackScroll()
-  sendPose({ x: round(player.position.x), y: round(player.position.y), z: round(player.position.z - track), yaw: round(player.facing), speed: round(racing ? race.boatSpeed() : speed) })
+  sendPose({ x: round(player.position.x), y: round(player.position.y), z: round(player.position.z - track), yaw: round(player.facing), speed: round(racing ? race.horseSpeed() : speed) })
   remotes.update(dt, elapsed, player.renderPosition, track, scroll, camera)
   hud.update()
   updateParticles(elapsed, renderer.domElement.height)

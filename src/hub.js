@@ -28,7 +28,7 @@ export function createHub(scene, windows) {
     g.position.set(spec.x, 0, spec.z)
     scene.add(g)
     const glowMat = new MeshBasicMaterial({ map: dotTex, color: spec.color, transparent: true, opacity: 0.6, blending: AdditiveBlending, depthWrite: false })
-    put(g, base, baseMat, 0, 0.04, 0) // dark so the glow stands out on the pale sand
+    put(g, base, baseMat, 0, 0.04, 0) // dark so the glow stands out on the pale dirt
     const pool = put(g, disc, glowMat, 0, 0.09, 0, false)
     pool.rotation.x = -Math.PI / 2
     const rim = put(g, ring, neon(spec.color, 2.4), 0, 0.1, 0, false)

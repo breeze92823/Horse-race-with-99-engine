@@ -128,7 +128,7 @@ export function createEmitter(scene, opts) {
   return points
 }
 
-// Takes an emitter out of the scene and frees it (a remote player's boat leaving).
+// Takes an emitter out of the scene and frees it (a remote player's horse leaving).
 export function removeEmitter(points) {
   const i = emitters.findIndex((e) => e.points === points)
   if (i >= 0) emitters.splice(i, 1)

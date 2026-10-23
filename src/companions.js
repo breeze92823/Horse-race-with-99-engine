@@ -19,15 +19,15 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { COMPANIONS, PARTNER, PETS } from './config.js'
 import { LOOKS } from './pets.js'
 
-// The 3D pets and partner that go with a boat, for the local player (main.js) and every remote
+// The 3D pets and partner that go with a horse, for the local player (main.js) and every remote
 // player (remotePlayers.js) alike. Each pet / partner is ONE mesh: blocky parts with vertex
 // colours, merged and cached per kind, so a full room stays cheap on phones. The looks follow
 // the window portraits (pets.js LOOKS, partner.js looks in PARTNER): a pet is a rounded cube
 // with googly eyes and its kind's ears / gills / wings / horns; a partner is a blocky figure in
 // its shirt, pants, hair or hat (and cape). Golden pets get a gold metal finish, Rainbow pets a
 // colour-cycling glow (one shared material, its hue advanced once per frame).
-// Pets hover in slots behind and beside the boat (COMPANIONS.slots) and swing after its turns;
-// the partner stands on the boat's `seat`, behind the rider.
+// Pets hover in slots behind and beside the horse (COMPANIONS.slots) and swing after its turns;
+// the partner stands on the horse's `seat` (its rump), behind the rider.
 
 const INK = '#1d1a22'
 const toMatrix = new Matrix4()
@@ -252,9 +252,9 @@ export function updateCompanionMaterials(t) {
   MATS.rainbow.emissive.setHSL((t * 0.25) % 1, 1, 0.5)
 }
 
-// --- A boat's companions --------------------------------------------------------------------
-// scene: where the pets fly (they swing after the boat in world space); seat: the boat's
-// partner seat (boat.js). shadows: cast shadows (the local player's only).
+// --- A horse's companions -------------------------------------------------------------------
+// scene: where the pets fly (they swing after the horse in world space); seat: the horse's
+// partner seat (horse.js). shadows: cast shadows (the local player's only).
 export function createCompanions(scene, seat, { shadows = false } = {}) {
   const pets = new Group() // follows the owner, yaw eased so the pets swing round after turns
   scene.add(pets)

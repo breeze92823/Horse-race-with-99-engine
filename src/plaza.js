@@ -21,28 +21,28 @@ import {
 import { PLAZA } from './config.js'
 import { short } from './interact.js'
 import { createEmitter } from './particles.js'
-import { paintFade, paintFlag, paintLaneWater, paintText, paintWaterfall } from './textures.js'
+import { paintFade, paintFlag, paintText, paintTreadmill, paintWaterfall } from './textures.js'
 import { fontReady, glow, label, neon, put, solidBox, solidPole, std } from './propkit.js'
 
-// The training plaza at the back of the beach (+Z), laid out like the
+// The training plaza at the back of the ranch (+Z), laid out like the
 // reference's south view from the spawn:
 //  - two Train stations: a slate platform with yellow trim, six treadmill
-//    lanes (glowing scrolling water, neon rails, SPEED boards with lock /
+//    lanes (glowing scrolling treadmill belts, neon rails, SPEED boards with lock /
 //    requirement tags) leaning toward the middle, a dark and a yellow
 //    leaderboard behind them (Rebirth / Wins, Power / Playtime: the server's top
 //    saved players, see setLeaderboard) and a big "Train" sign
-//  - the VIP portal on a dais in the middle (to the City and back: worlds.js),
+//  - the VIP portal on a dais in the middle (to the Frontier Town and back: worlds.js),
 //    under a glowing waterfall with light rays, mist and spray
 //  - left (+X): the Golden Machine and the Index kiosk; right (-X): Forest
-//    Relics and a treasure chest (the green boat further right is in the
-//    west Boats stall, shops.js)
-//  - red feather flags (the cliffs and palms ringing it all are scenery, built
+//    Relics and a treasure chest (the unicorn further right is in the
+//    west Horses stall, shops.js)
+//  - red feather flags (the cliffs and oaks ringing it all are scenery, built
 //    per world: environment.js)
 //  - particles (particles.js): waterfall mist + falling spray, sparkles around
-//    the falls and portal, bubbles off every lane, golden motes at the VIP gate
+//    the falls and portal, energy motes off every lane, golden motes at the VIP gate
 // Glowing parts are HDR-bright (neon rails, waterfall, VIP gate) so the bloom
 // pass makes them shine; without bloom they still read as saturated colour.
-// Platforms and lanes are low enough to drive onto; everything else is solid.
+// Platforms and lanes are low enough to ride onto; everything else is solid.
 const P = PLAZA
 
 function canvasTexture(c, repeatX = 1, repeatY = 1) {
@@ -163,7 +163,7 @@ function buildVip(root, animated) {
 
 // --- Train stations ----------------------------------------------------------------------
 // One treadmill lane in its own frame (+Z = the far end), placed in its
-// station's frame: a dark base, glowing water belt, neon rails all round, and
+// station's frame: a dark base, a glowing treadmill belt, neon rails all round, and
 // a SPEED board with its lock tag.
 function buildLane(parent, x, z, spec, i, animated) {
   const L = P.lane
@@ -172,8 +172,8 @@ function buildLane(parent, x, z, spec, i, animated) {
   parent.add(g)
   const color = spec.neon[i]
   put(g, new BoxGeometry(L.width + 0.3, 0.3, L.length + 0.3), std('#1c2133', { roughness: 0.6 }), 0, 0.15, 0)
-  const water = canvasTexture(paintLaneWater(), 1, L.length / 2.7)
-  const surface = put(g, new PlaneGeometry(L.width - 0.5, L.length - 0.4), std('#ffffff', { map: water, emissiveMap: water, emissive: '#ffffff', emissiveIntensity: 0.5, roughness: 0.2 }), 0, 0.31, 0, false)
+  const belt = canvasTexture(paintTreadmill(), 1, L.length / 2.7)
+  const surface = put(g, new PlaneGeometry(L.width - 0.5, L.length - 0.4), std('#ffffff', { map: belt, emissiveMap: belt, emissive: '#ffffff', emissiveIntensity: 0.6, roughness: 0.7 }), 0, 0.31, 0, false)
   surface.rotation.x = -Math.PI / 2
   surface.receiveShadow = true
   // Neon tube rails along both sides and across both ends.
@@ -203,7 +203,7 @@ function buildLane(parent, x, z, spec, i, animated) {
   open.position.set(0, by + 1.05, bz)
   open.visible = false
   g.add(open)
-  animated.push((t, dt) => (water.offset.y -= dt * 1.4))
+  animated.push((t, dt) => (belt.offset.y -= dt * 1.4))
   return { g, tag, open }
 }
 
@@ -504,7 +504,7 @@ function buildParticles(scene, lanes) {
     count: 90, life: 4.5, velocity: [0, 0.45, 0], spread: [0.25, 0.25, 0.25],
     size: 0.75, color: '#ffffff', intensity: 2.4, twinkle: 5, sprite: 'sparkle', seed: 13,
   })
-  // Bubbles rising off every treadmill, tinted by its neon.
+  // Energy motes rising off every treadmill, tinted by its neon.
   const L = P.lane
   const at = new Vector3()
   createEmitter(scene, {

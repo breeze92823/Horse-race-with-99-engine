@@ -1,6 +1,6 @@
 /* Trails scene (trails.js), measured off the 1920x992 reference. Every length is
    reference pixels times --tu: 1px on that screen, scaled to fit; portrait
-   phones get their own unit and put both panels side by side under the boat.
+   phones get their own unit and put both panels side by side under the horse.
    On touch the cards, buttons and Exit never drop below 44 px. */
 .tr-scene {
   --tu: min(calc(100vw / 1920), calc(100vh / 992));
@@ -469,7 +469,7 @@ body.tr-open .touch-root {
   from { transform: translate(-50%, 200%); }
 }
 
-/* --- Portrait phones: boat up top, both panels side by side under it ------------- */
+/* --- Portrait phones: horse up top, both panels side by side under it ------------ */
 @media (orientation: portrait) {
   .tr-scene {
     --tu: min(calc((100vw - 24px) / 790), calc(100vh / 1700));

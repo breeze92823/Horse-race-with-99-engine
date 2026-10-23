@@ -2,7 +2,7 @@ import { Group, Matrix4, Mesh } from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 
 // --- Baking: one mesh per material ------------------------------------------------
-// Props are built from many small meshes (a palm is ~20); merging the ones
+// Props are built from many small meshes (an oak is ~5, a farm ~60); merging the ones
 // that share a look keeps a set piece to a handful of draw calls (mobile).
 const matKey = (m) => [m.type, m.color?.getHexString(), m.emissive?.getHexString(), m.vertexColors, m.side, m.flatShading, m.transparent, m.opacity, m.blending, m.map?.uuid, m.roughness, m.metalness, m.userData.k].join('|')
 const rel = new Matrix4()

@@ -3,7 +3,7 @@ import { TRAILS } from './config.js'
 import { trailTexture } from './trailTextures.js'
 
 // The equipped trail behind the player's horse: a textured band fed from just
-// behind the hind hooves (TRAILS.ribbon.stern m back). Point 0 is pinned there;
+// behind the hind hooves (TRAILS.ribbon.back m back). Point 0 is pinned there;
 // a new point is dropped every `spacing` metres, and each point narrows a
 // little and fades at the end of its `life`. The band turns about its path to
 // face the camera, so it stands upright seen from the side (the Trails scene)
@@ -72,7 +72,7 @@ export function createTrail(scene, horseRoot) {
 
   let width = R.width
   let tile = R.tile
-  const stern = new Vector3()
+  const origin = new Vector3()
   const fwd = new Vector3()
   const side = new Vector3()
   const along = new Vector3()
@@ -81,9 +81,9 @@ export function createTrail(scene, horseRoot) {
   function reset() {
     count = 1
     travel = 0
-    px[0] = stern.x
-    py[0] = stern.y
-    pz[0] = stern.z
+    px[0] = origin.x
+    py[0] = origin.y
+    pz[0] = origin.z
     age[0] = 0
     laid[0] = 0
   }
@@ -104,10 +104,10 @@ export function createTrail(scene, horseRoot) {
     },
     update(dt, camera, scroll = 0) {
       horseRoot.updateWorldMatrix(true, false)
-      stern.set(0, R.height, -R.stern).applyMatrix4(horseRoot.matrixWorld)
+      origin.set(0, R.height, -R.back).applyMatrix4(horseRoot.matrixWorld)
       fwd.set(0, 0, 1).transformDirection(horseRoot.matrixWorld)
-      if (count === 0 || Math.hypot(stern.x - px[0], stern.z - pz[0]) > TELEPORT) reset()
-      travel += Math.hypot(stern.x - px[0], stern.z - pz[0]) + scroll * dt
+      if (count === 0 || Math.hypot(origin.x - px[0], origin.z - pz[0]) > TELEPORT) reset()
+      travel += Math.hypot(origin.x - px[0], origin.z - pz[0]) + scroll * dt
       if (travel > 20000) {
         // Keep u small enough for float precision: shift by whole texture repeats (invisible).
         const shift = Math.floor(travel / tile) * tile
@@ -124,8 +124,8 @@ export function createTrail(scene, horseRoot) {
       }
       while (count > 1 && age[count - 1] > R.life) count--
 
-      // A new point once the stern has moved `spacing` past the last one.
-      if (count === 1 || Math.hypot(stern.x - px[1], stern.z - pz[1]) >= R.spacing) {
+      // A new point once the origin has moved `spacing` past the last one.
+      if (count === 1 || Math.hypot(origin.x - px[1], origin.z - pz[1]) >= R.spacing) {
         const last = Math.min(count, n - 1)
         for (let i = last; i > 1; i--) {
           px[i] = px[i - 1]
@@ -134,16 +134,16 @@ export function createTrail(scene, horseRoot) {
           age[i] = age[i - 1]
           laid[i] = laid[i - 1]
         }
-        px[1] = stern.x
-        py[1] = stern.y
-        pz[1] = stern.z
+        px[1] = origin.x
+        py[1] = origin.y
+        pz[1] = origin.z
         age[1] = 0
         laid[1] = travel
         count = last + 1
       }
-      px[0] = stern.x
-      py[0] = stern.y
-      pz[0] = stern.z
+      px[0] = origin.x
+      py[0] = origin.y
+      pz[0] = origin.z
       laid[0] = travel
 
       // Two vertices per point (lower edge v=0, upper v=1), across the path and toward the camera.

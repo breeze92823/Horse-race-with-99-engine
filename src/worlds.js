@@ -69,7 +69,7 @@ export function createWorlds(deps) {
     plaza.setPortal(lines, isOpen(id, st))
   }
 
-  // Shows world `id` at once: its scenery, sea and sky; the portal now leads back.
+  // Shows world `id` at once: its scenery, ground and sky; the portal now leads back.
   function apply(id) {
     worldState.current = id
     const def = WORLDS.list[id]

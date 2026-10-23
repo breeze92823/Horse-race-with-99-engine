@@ -196,7 +196,7 @@
 .next-at {
   color: #fff;
 }
-/* A trophy flying from the boat into the counter (positioned by its WAAPI transform). */
+/* A trophy flying from the horse into the counter (positioned by its WAAPI transform). */
 .race-fly {
   position: absolute;
   left: 0;
@@ -288,7 +288,7 @@
 }
 
 /* Phone landscape: the right column comes down to the bars, so the studs callout
-   moves to the free space left of the boat. */
+   moves to the free space left of the horse. */
 .hud.short .race-studs {
   left: auto;
   right: calc(50% + 110 * var(--u));

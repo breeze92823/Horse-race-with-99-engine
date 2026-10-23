@@ -9,7 +9,7 @@
 //                       └─ engine ─────────┘
 // `world` dips while a menu window is open so the UI sits on top of the scene.
 // The reverb is a generated impulse response: a few early reflections (the
-// cliffs and stalls) and a short, darkening tail, so one-shots sit in the beach
+// cliffs and stalls) and a short, darkening tail, so one-shots sit in the ranch
 // instead of sounding pasted on top of it.
 import { AUDIO, COARSE_POINTER } from '../config.js'
 
@@ -98,7 +98,7 @@ function makeNoise(ctx, seconds, kind, channels = 1) {
 }
 
 // Stereo impulse response: pre-delay, sparse early reflections, then a noise
-// tail whose high end dies first (air + sand absorb the highs).
+// tail whose high end dies first (air + grass absorb the highs).
 function makeImpulse(ctx) {
   const R = AUDIO.reverb
   const sr = ctx.sampleRate

@@ -22,7 +22,7 @@ function shadowed(mesh) {
   return mesh
 }
 
-// One engine (shared with the lobby's parked raft and the catalog models). Nose +Z, flame out of -Z.
+// One engine (shared with the lobby's parked cart). Nose +Z, flame out of -Z.
 export function makeEngine({ body = HORSE.engine, band = HORSE.engineBand, flame = HORSE.flame } = {}) {
   const group = new Group()
   const bodyMat = std(body, { roughness: 0.4 })

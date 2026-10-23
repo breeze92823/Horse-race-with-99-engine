@@ -50,7 +50,7 @@ class Remote {
     this.animator = null
     this.avatarJson = null // what the current rig was built from
     this.generation = 0
-    this.applied = {} // boat / engine / trail / pets / partner / name as last applied
+    this.applied = {} // boat (= horse) / engine / trail / pets / partner / name as last applied
     this.label = null
     this.placed = false
     this.detail = true
@@ -99,7 +99,7 @@ class Remote {
     if (p.boat !== a.boat) {
       a.boat = p.boat
       this.horse.setLook(horseLook(horseById.has(p.boat) ? p.boat : HORSES.start.equipped)) // none sent yet: the starter
-      a.engine = undefined // the engine count comes with the boat
+      a.engine = undefined // the booster count comes with the horse
     }
     if (p.engine !== a.engine) {
       a.engine = p.engine

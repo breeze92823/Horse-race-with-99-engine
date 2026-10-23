@@ -7,7 +7,7 @@
 // the bell a church/hand-bell partial set, wood and plastic die in tens of ms.
 import { COARSE_POINTER } from '../config.js'
 import { A, isMuted, now, voice } from './core.js'
-import { bubble, bubbles, burst, crinkle, modal, pick, rnd, route, saturation, tone, vary } from './synth.js'
+import { bubble, burst, crinkle, modal, pick, rnd, route, saturation, tone, vary } from './synth.js'
 
 const COIN = [[1, 1, 0.5], [1.504, 0.6, 0.36], [2.24, 0.45, 0.26], [2.71, 0.3, 0.18], [3.47, 0.22, 0.12], [4.03, 0.12, 0.08]]
 const TROPHY = [[1, 1, 0.7], [2.05, 0.5, 0.5], [3.1, 0.34, 0.32], [4.33, 0.2, 0.2], [5.6, 0.1, 0.12]]
@@ -249,7 +249,7 @@ export function neigh(gain = 0.16, pan = 0, t = now()) {
 }
 
 // Stadium air horn: two reeds a major third apart, a breath of air, and the
-// beach throwing it back. len s of blast.
+// ranch throwing it back. len s of blast.
 export function airHorn(len = 0.7, t = now(), gain = 0.17) {
   const ctx = A.ctx
   const out = ctx.createGain()
@@ -527,24 +527,24 @@ export function dayNight() {
   burst({ t, noise: 'pink', f: 250, f2: 1200, q: 0.6, a: 0.5, d: 0.6, gain: 0.12 })
 }
 
-// Trails scene in/out: a big sweep of air and sea.
+// Trails scene in/out: a big sweep of air through the grass.
 export function sceneIn() {
   if (!limit('scene', 300) || !voice(1, 2)) return
   const t = now()
   burst({ t, noise: 'pink', f: 280, f2: 2600, q: 0.7, a: 0.16, d: 0.35, gain: 0.3, bus: A.ui })
-  bubbles({ t: t + 0.12, n: COARSE_POINTER ? 8 : 16, dur: 0.4, f0: 500, f1: 2600, gain: 0.04, bus: A.ui })
+  crinkle({ t: t + 0.12, n: COARSE_POINTER ? 8 : 16, dur: 0.4, gain: 0.04, f0: 2500, f1: 7000, bus: A.ui })
 }
 export function sceneOut() {
   if (!limit('scene', 300) || !voice(0.5, 2)) return
   burst({ t: now(), noise: 'pink', f: 2400, f2: 260, q: 0.7, a: 0.03, d: 0.25, gain: 0.25, bus: A.ui })
 }
 
-// Previewing a trail: a swish of water past the hull.
+// Previewing a trail: a swish past the hooves, a little dirt kicked up.
 export function swish() {
   if (!limit('swish', 60) || !voice(0.3, 1)) return
   const t = now()
   burst({ t, noise: 'pink', f: 900, f2: 2600, q: 0.9, a: 0.04, d: 0.16, gain: 0.3, bus: A.ui })
-  bubbles({ t: t + 0.04, n: 5, dur: 0.15, f0: 800, f1: 3000, gain: 0.03, bus: A.ui })
+  crinkle({ t: t + 0.04, n: 5, dur: 0.15, gain: 0.03, f0: 2000, f1: 6000, bus: A.ui })
 }
 
 // Egg hatch: shell cracks (sharp, brittle snaps), then the reveal (bigger for rarer pets: 0..5).

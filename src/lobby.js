@@ -27,19 +27,19 @@ import { paintFade, paintPlanks, paintSoftDot } from './textures.js'
 import { fontReady, glow, label, neon, put, solidBox, solidPole, std } from './propkit.js'
 import { createEmitter } from './particles.js'
 
-// Everything standing on the lobby beach, laid out like the reference shot
-// from the spawn looking toward the sea (-Z):
-//  - the START gate at the shoreline: two black posts, a black banner, a
+// Everything standing on the ranch yard, laid out like the reference shot
+// from the spawn looking toward the start gate (-Z):
+//  - the START gate at the yard's front edge: two black posts, a black banner, a
 //    glowing yellow start pad with a light curtain, and the dirt track with
 //    rail fences out into the meadow (track.js); three red arrows bob above it
 //  - plank corral walls on both sides, a wooden boardwalk with a neon
 //    yellow rim inland of the right one, with four hero statues on it in
 //    front of the taller wall (name + stat tags, coloured auras and sparkles)
 //  - on the left: the Engine Upgrade machine (caged, flaming, smoking, a
-//    glowing gold ring, a parked log raft), two engine rockets hovering over
+//    glowing gold ring, a parked cart with boosters), two engine rockets hovering over
 //    glowing pads with sparkles
-// The palms and the striped umbrella are scenery, built per world (environment.js).
-// Solid props get fixed colliders so the boat cannot drive through them.
+// The oaks and the wind pump are scenery, built per world (environment.js).
+// Solid props get fixed colliders so the horse cannot ride through them.
 const G = LOBBY.gate
 const C = LOBBY.colors
 
@@ -140,7 +140,7 @@ function buildGate(root, animated) {
   return lane
 }
 
-// --- Barriers, walkway and statues on the shoreline wings --------------------------
+// --- Barriers, walkway and statues on the yard's wings ------------------------------
 // A barrier line from its gate end `from` to `to`, as unit vectors: `u` points
 // back toward the gate, `n` points inland (toward the spawn). `at(t, off)` is
 // the point t metres from the gate end, `off` metres inland.
@@ -428,7 +428,7 @@ function buildUpgrade(root, animated, spots) {
   const darkRed = std('#8e1015', { roughness: 0.5 })
   const metal = std('#3a3f48', { metalness: 0.6, roughness: 0.35 })
 
-  // Gold ring on the sand.
+  // Gold ring on the ground.
   const ring = put(g, new TorusGeometry(2.6, 0.13, 10, 48), neon('#ffd21a'), 0, 0.08, 0, false)
   ring.rotation.x = Math.PI / 2
   put(g, new CylinderGeometry(1.6, 1.7, 0.4, 28), darkRed, 0, 0.2, 0)
@@ -485,23 +485,29 @@ function buildUpgrade(root, animated, spots) {
   g.add(tag)
   spots.push({ x, y: 4.6 * s, z })
 
-  // A log raft parked beside the machine, waiting for its upgrade.
-  const raft = new Group()
-  raft.position.set(x + 3.5 * s, 0, z - 0.6 * s)
-  raft.rotation.y = -0.35
-  root.add(raft)
-  const log = new CylinderGeometry(0.19, 0.19, 2.6, 12)
-  log.rotateX(Math.PI / 2)
-  const wood = [std('#b07a45', { roughness: 0.85 }), std('#9a6538', { roughness: 0.85 })]
-  for (let i = 0; i < 5; i++) put(raft, log, wood[i % 2], (i - 2) * 0.38, 0.2, 0)
+  // A wooden cart parked beside the machine, two cold boosters strapped to it, waiting for its
+  // upgrade.
+  const cart = new Group()
+  cart.position.set(x + 3.5 * s, 0, z - 0.6 * s)
+  cart.rotation.y = -0.35
+  root.add(cart)
+  const wood = std('#b07a45', { roughness: 0.85 })
+  const dark = std('#7a4f2a', { roughness: 0.9 })
+  put(cart, new BoxGeometry(1.7, 0.12, 2.4), wood, 0, 0.62, 0) // bed
+  for (const sx of [-1, 1]) put(cart, new BoxGeometry(0.1, 0.35, 2.4), dark, sx * 0.8, 0.85, 0) // side boards
+  put(cart, new BoxGeometry(1.7, 0.35, 0.1), dark, 0, 0.85, -1.15)
+  for (const sx of [-1, 1]) put(cart, new BoxGeometry(0.08, 0.08, 1.6), dark, sx * 0.35, 0.6, 2.0).rotation.x = -0.12 // shafts
+  const wheel = new CylinderGeometry(0.55, 0.55, 0.12, 14)
+  wheel.rotateZ(Math.PI / 2)
+  for (const sx of [-1, 1]) put(cart, wheel, dark, sx * 0.95, 0.55, -0.2)
+  put(cart, new CylinderGeometry(0.05, 0.05, 2.1, 6), metal, 0, 0.55, -0.2).rotation.z = Math.PI / 2 // axle
   for (const side of [-1, 1]) {
     const e = makeEngine()
-    e.group.position.set(side * 1.25, 0.32, -0.3)
-    raft.add(e.group)
+    e.group.position.set(side * 0.42, 1.05, -0.2)
+    cart.add(e.group)
     e.flame.visible = false
   }
-  put(raft, new BoxGeometry(2.9, 0.1, 0.2), metal, 0, 0.36, -0.3)
-  solidBox(1.3, 0.5, 1.3, raft.position.x, 0.5, raft.position.z, raft.rotation.y)
+  solidBox(1.3, 0.5, 1.3, cart.position.x, 0.5, cart.position.z, cart.rotation.y)
 }
 
 export function createLobby(scene) {

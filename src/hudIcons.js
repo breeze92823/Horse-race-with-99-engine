@@ -84,9 +84,6 @@ export const ICONS = {
   ),
 
   // --- Hotbar items --------------------------------------------------------------
-  kayak: svg(
-    `<path d="M3 38c10-10 40-14 58-6-8 10-42 14-58 6z" fill="#e8b21a" ${O}/><path d="M8 37c14-5 34-7 48-5" fill="none" stroke="#ffe27a" stroke-width="3" stroke-linecap="round"/><ellipse cx="32" cy="35" rx="10" ry="3.5" fill="#7a5200"/>`,
-  ),
   engineItem: svg(
     `<g transform="rotate(-40 32 32)"><rect x="24" y="4" width="16" height="34" rx="8" fill="#e9fff0" ${O}/><path d="M24 14h16M24 22h16" stroke="#2fbf5a" stroke-width="5"/><path d="M26 38h12l3 8H23z" fill="#3c3f48" ${O}/><path d="M24 46c0 8 4 12 8 16 4-4 8-8 8-16z" fill="#4ad0ff" ${O}/></g>`,
   ),

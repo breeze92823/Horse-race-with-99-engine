@@ -10,7 +10,7 @@ import {
   ShapeGeometry,
   SphereGeometry,
 } from 'three'
-import { BEACH, GROUND, ISLET, TOWN, WATER } from './config.js'
+import { GROUND, HILL, TOWN, YARD } from './config.js'
 import { RAPIER, addFixed } from './physics.js'
 import { mulberry32, paintDirt, paintGrass, toTexture } from './textures.js'
 import { buildOak } from './propkit.js'
@@ -31,8 +31,8 @@ import { bake } from './bake.js'
 //  - meadow: the grass painter's colour + bump, its v offset scrolled by a race
 
 // The start island's outline in world (x, z), counter-clockwise seen from above. Convex.
-export function beachOutline() {
-  const { front, back, halfWidth: W, wingZ, gateEdge } = BEACH
+export function yardOutline() {
+  const { front, back, halfWidth: W, wingZ, gateEdge } = YARD
   return [
     [-W, back],
     [W, back],
@@ -73,7 +73,7 @@ export function makeHill(x, z, rx, ry, rz, color, seed) {
   geo.computeVertexNormals()
   const hill = new Mesh(geo, new MeshStandardMaterial({ color, roughness: 1 }))
   hill.scale.set(rx, ry, rz)
-  hill.position.set(x, WATER.level - 1, z)
+  hill.position.set(x, GROUND.sunk, z)
   return [hill]
 }
 
@@ -83,7 +83,7 @@ function makeClouds() {
   const mat = new MeshLambertMaterial({ color: '#ffffff', emissive: '#dcebff', emissiveIntensity: 0.62, fog: false })
   const group = new Group()
   for (let i = 0; i < 22; i++) {
-    // Mostly ahead (toward the sea, -Z), a few all around.
+    // Mostly ahead (down the race track, -Z), a few all around.
     const ang = i < 15 ? -Math.PI / 2 + (rand() - 0.5) * Math.PI * 1.25 : rand() * Math.PI * 2
     const dist = 240 + rand() * 170
     const cloud = new Group()
@@ -112,8 +112,8 @@ function makeClouds() {
 // Its top sits just over the meadow. Visual only (landColliders is shared by every world).
 export function buildSlab(root, top, side) {
   const bevel = 0.6
-  const slabGeo = new ExtrudeGeometry(outlineShape(beachOutline()), {
-    depth: BEACH.depth,
+  const slabGeo = new ExtrudeGeometry(outlineShape(yardOutline()), {
+    depth: YARD.depth,
     bevelEnabled: true,
     bevelThickness: bevel,
     bevelSize: 1.2,
@@ -122,7 +122,7 @@ export function buildSlab(root, top, side) {
   })
   slabGeo.rotateX(-Math.PI / 2)
   const slab = new Mesh(slabGeo, [top, new MeshStandardMaterial({ color: side, roughness: 1 })])
-  slab.position.y = -(BEACH.depth + bevel)
+  slab.position.y = -(YARD.depth + bevel)
   slab.receiveShadow = true
   root.add(slab)
 }
@@ -149,16 +149,16 @@ function roundedRect([x0, z0, x1, z1, r]) {
 export function buildRanchLand(root) {
   const grass = paintGrass()
   const top = new MeshStandardMaterial({
-    color: BEACH.grass,
+    color: YARD.grass,
     map: toTexture(grass.color, { repeat: 1 / GROUND.tile, srgb: true }),
     bumpMap: toTexture(grass.height, { repeat: 1 / GROUND.tile }),
     bumpScale: 0.6,
     roughness: 1,
   })
-  buildSlab(root, top, BEACH.side)
-  const dirtGeo = new ShapeGeometry(BEACH.dirt.map(roundedRect), 6)
+  buildSlab(root, top, YARD.side)
+  const dirtGeo = new ShapeGeometry(YARD.dirt.map(roundedRect), 6)
   dirtGeo.rotateX(-Math.PI / 2)
-  const dirt = new Mesh(dirtGeo, new MeshStandardMaterial({ map: toTexture(paintDirt(), { repeat: 1 / BEACH.dirtTile, srgb: true }), roughness: 1 }))
+  const dirt = new Mesh(dirtGeo, new MeshStandardMaterial({ map: toTexture(paintDirt(), { repeat: 1 / YARD.dirtTile, srgb: true }), roughness: 1 }))
   dirt.position.y = 0.02
   dirt.receiveShadow = true
   root.add(dirt)
@@ -171,25 +171,25 @@ export function buildRanchLand(root) {
   )
 
   // The hill out east, with oaks on it.
-  const I = ISLET
+  const I = HILL
   root.add(...makeHill(I.x, I.z, I.hill.rx, I.hill.ry, I.hill.rz, '#4dbb3c', 14))
   const oaks = new Group()
   I.trees.forEach(([x, z, h], i) => buildOak(oaks, I.x + x, I.z + z, h, 50 + i, hillTop(x, z) - 0.4, false))
   root.add(bake(oaks, true))
 }
 
-// Height of the hill's surface (makeHill: a squashed dome sunk to WATER.level - 1) at (x, z) from
+// Height of the hill's surface (makeHill: a squashed dome sunk to GROUND.sunk) at (x, z) from
 // its centre, ignoring its bumps.
 export function hillTop(x, z) {
-  const { rx, ry, rz } = ISLET.hill
-  return WATER.level - 1 + ry * Math.sqrt(Math.max(0, 1 - (x / rx) ** 2 - (z / rz) ** 2))
+  const { rx, ry, rz } = HILL.hill
+  return GROUND.sunk + ry * Math.sqrt(Math.max(0, 1 - (x / rx) ** 2 - (z / rz) ** 2))
 }
 
 // Collision for the land (every world): the slab as a convex hull and a fence along every edge.
 export function landColliders() {
-  const outline = beachOutline()
+  const outline = yardOutline()
   const hull = []
-  for (const [x, z] of outline) hull.push(x, 0, z, x, -BEACH.depth, z)
+  for (const [x, z] of outline) hull.push(x, 0, z, x, -YARD.depth, z)
   addFixed(RAPIER.ColliderDesc.convexHull(new Float32Array(hull)), { x: 0, y: 0, z: 0 }, null, { friction: 0.9 })
   for (let i = 0; i < outline.length; i++) {
     const [ax, az] = outline[i]
@@ -197,8 +197,8 @@ export function landColliders() {
     const len = Math.hypot(bx - ax, bz - az)
     const yaw = Math.atan2(-(bz - az), bx - ax)
     addFixed(
-      RAPIER.ColliderDesc.cuboid(len / 2 + 0.5, BEACH.fenceHeight / 2, 0.4),
-      { x: (ax + bx) / 2, y: BEACH.fenceHeight / 2, z: (az + bz) / 2 },
+      RAPIER.ColliderDesc.cuboid(len / 2 + 0.5, YARD.fenceHeight / 2, 0.4),
+      { x: (ax + bx) / 2, y: YARD.fenceHeight / 2, z: (az + bz) / 2 },
       { x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) },
     )
   }

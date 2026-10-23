@@ -1,6 +1,6 @@
 // In-race HUD pieces from the reference screenshot, added to the main HUD
 // (hud.js) while a race runs (race.js):
-//   - speedometer under the boat: rainbow arc, 0 / quarter / top-speed ticks,
+//   - speedometer under the horse: rainbow arc, 0 / quarter / top-speed ticks,
 //     white needle, current speed
 //   - "↑ 770 Studs" distance callout to its upper right
 //   - the red Leave button to its right
@@ -13,7 +13,7 @@
 //   - tap boost: "TAP!" inside the speedometer arc until you tap, then "+18%";
 //     a boosted gauge glows and its needle shakes; every tap leaves a ripple
 //   - the checkpoint reward: a trophy "+N" under the studs callout, trophies
-//     flying from the boat into the trophy counter (which counts up as each
+//     flying from the horse into the trophy counter (which counts up as each
 //     lands) and a burst of confetti
 // Sizes are reference pixels times the HUD's --u; styles in race.css.
 import './race.css'
@@ -196,7 +196,7 @@ export function createRaceHud(hud, { onLeave }) {
   }
   const at = (x, y, k) => `translate(${x}px, ${y}px) translate(-50%, -50%) scale(${k})`
 
-  // One trophy: pops out of the boat, hangs a moment, then flies into the counter.
+  // One trophy: pops out of the horse, hangs a moment, then flies into the counter.
   function fly(share, x0, y0, delay, i = 0) {
     const e = el('span', 'race-fly', ICONS.trophy)
     hud.root.append(e)
@@ -285,7 +285,7 @@ export function createRaceHud(hud, { onLeave }) {
       r.addEventListener('animationend', () => r.remove())
       hud.root.append(r)
     },
-    // A checkpoint paid `won` Wins (doubled by Luck when `lucky`); (x, y) = the boat on screen. The Wins are
+    // A checkpoint paid `won` Wins (doubled by Luck when `lucky`); (x, y) = the horse on screen. The Wins are
     // added to the trophy counter as the trophies land.
     reward(won, x, y, lucky = false) {
       bonusNum.textContent = bonusNum.dataset.t = `+${short(won)}`

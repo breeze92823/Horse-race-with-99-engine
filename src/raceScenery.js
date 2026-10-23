@@ -1,6 +1,6 @@
 import { BoxGeometry, CanvasTexture, Color, ConeGeometry, CylinderGeometry, DodecahedronGeometry, DoubleSide, Euler, Float32BufferAttribute, Group, IcosahedronGeometry, Matrix4, Mesh, PlaneGeometry, Quaternion, SphereGeometry, SRGBColorSpace, TorusGeometry, Vector3 } from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
-import { GROUND, LOBBY, PLAZA, RACE, WATER } from './config.js'
+import { GROUND, LOBBY, PLAZA, RACE } from './config.js'
 import { buildOak, fontReady, std } from './propkit.js'
 import { mulberry32, paintText } from './textures.js'
 import { bake } from './bake.js'
@@ -15,7 +15,7 @@ import { bake } from './bake.js'
 // RACE.scenery.gap m, mostly alternating sides, appears inside the fog ahead
 // and goes back to its pool once well behind the horse. A rock, rainbow or
 // ranch-gate arch spans the track every archEvery m. The start island (`home`:
-// the beach, lobby, plaza, shops) slides away with the same scroll and is
+// the ranch, lobby, plaza, shops) slides away with the same scroll and is
 // hidden once it has gone into the fog, so it never trails the horse.
 const S = RACE.scenery
 const HALF = LOBBY.gate.halfWidth
@@ -58,7 +58,7 @@ function rod(a, b, r) {
 // Each returns { root, update?(t) }; roots are built at the origin, standing on the meadow
 // (GROUND.level), facing -Z (a grandstand faces +Z: it is turned toward the track).
 const FOOT = GROUND.level // where everything stands
-const ROCK_FOOT = WATER.level - 1 // cliff / arch rock feet, sunk below the meadow
+const ROCK_FOOT = GROUND.sunk // rock arch feet, sunk below the meadow
 
 // A box / sphere / cylinder in one flat colour, as a non-indexed geometry with a vertex colour (for
 // pieces merged into one vertex-coloured mesh: the crowd, the herds).
@@ -479,15 +479,15 @@ export function createRaceScenery(scene, home) {
       if (homeZ.length) setHome(0)
       homeZ.length = homeVisible.length = 0
     },
-    // scroll: m the world has slid toward +Z; boatZ: the horse's world z.
-    update(dt, scroll, boatZ) {
+    // scroll: m the world has slid toward +Z; horseZ: the horse's world z.
+    update(dt, scroll, horseZ) {
       if (!built) return
       t += dt
-      while (cursor + scroll > boatZ - S.ahead) {
+      while (cursor + scroll > horseZ - S.ahead) {
         placeNext(cursor)
         cursor -= lerp(S.gap, rand())
       }
-      while (nextArch + scroll > boatZ - S.ahead) {
+      while (nextArch + scroll > horseZ - S.ahead) {
         const piece = arches[archKind++ % arches.length]
         if (!piece.busy) place(piece, 0, 0, nextArch, 0)
         nextArch -= S.archEvery
@@ -495,7 +495,7 @@ export function createRaceScenery(scene, home) {
       for (let i = active.length - 1; i >= 0; i--) {
         const a = active[i]
         const z = a.z + scroll
-        if (z > boatZ + S.behind) {
+        if (z > horseZ + S.behind) {
           a.piece.busy = false
           a.piece.root.visible = false
           active.splice(i, 1)

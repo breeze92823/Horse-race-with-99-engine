@@ -41,12 +41,12 @@ export const GROUND_Y = 0
 // The start island (world.js): one convex slab, a grass ranch yard with packed-dirt areas. Its
 // front edge sweeps from the start gate (front, -Z) back toward +Z on both wings, so the side
 // barriers funnel toward the gate like the reference shot.
-export const BEACH = {
-  front: -46, // z of the shoreline at the start gate
+export const YARD = {
+  front: -46, // z of the yard's front edge at the start gate
   back: 90, // z of the back edge
   halfWidth: 75, // x extent of the wings
-  wingZ: 24, // z of the shoreline at the far left/right ends
-  gateEdge: 21.5, // half-width of the straight shoreline in front of the gate
+  wingZ: 24, // z of the front edge at the far left/right ends
+  gateEdge: 21.5, // half-width of the straight front edge in front of the gate
   depth: 4, // slab thickness
   fenceHeight: 3, // invisible wall around the yard so nobody rides off into the meadow
   side: '#7a5a3a', // the slab's earth edge
@@ -66,9 +66,8 @@ export const BEACH = {
 // The meadow every world stands in (world.js): grass out to the horizon, under the start island
 // and the race track, scrolled by a race. `tint` multiplies the grass (per world: WORLDS.list.*.ground,
 // which can also swap the grass for dirt).
-export const GROUND = { level: -0.05, size: 1400, tile: 9, tint: '#ffffff' }
-// Old sea height: still the sunk foot of the far hills, the plaza cliffs' neighbours and the hill.
-export const WATER = { level: -0.6, size: 1400, color: '#12a9e6', shallow: '#7ff0ff' }
+// sunk: where the far hills, the hill, mesas and the race's rock arches sink into it.
+export const GROUND = { level: -0.05, size: 1400, tile: 9, tint: '#ffffff', sunk: -1.6 }
 export const SPAWN = { x: 0, y: 0.05, z: 8 }
 export const SPAWN_FACING = Math.PI // yaw the character faces on spawn (PI = toward -Z, the start gate)
 
@@ -98,7 +97,7 @@ export const PHYSICS = {
   pushMass: 80, // kg the character weighs when shoving crates
   killY: -6, // sank this far: respawn
 }
-export const PLAYER_DIMS = { radius: 0.75, height: 1.8 } // wide capsule: it carries the boat
+export const PLAYER_DIMS = { radius: 0.75, height: 1.8 } // wide capsule: it carries the horse
 
 // --- Lobby props (lobby.js) ---------------------------------------------------
 // Roblox-scale, measured off the reference shot: the gate is ~38 m wide and
@@ -149,7 +148,7 @@ export const LOBBY = {
 // Oak trees (propkit.js), shared by the ranch, the plaza, the hill and the race scenery.
 export const OAK = { trunk: '#7a4f2a', leaves: ['#3f9e32', '#4fb33c', '#5cbf45', '#378a2c'] }
 
-// --- Training plaza at the back of the beach (plaza.js) ---------------------------
+// --- Training plaza at the back of the ranch (plaza.js) ---------------------------
 // The reference's south view: two Train stations either side of a VIP portal
 // under a waterfall, ringed by grassy cliffs. Facing it (+Z), +X is screen-left.
 export const PLAZA = {
@@ -157,7 +156,7 @@ export const PLAZA = {
   // Each station: six treadmill lanes in a straight grid of two rows of three
   // (station frame: rowZ/colX are lane centres), the whole station turned
   // (yaw) so the lanes' far ends lean toward the VIP in the middle. Lanes are
-  // ~2x the boat's length with 1.8 m aisles between columns and a 2.4 m
+  // ~2x the horse's length with 1.8 m aisles between columns and a 2.4 m
   // walkway between the rows (the front row's SPEED boards stand in it).
   // `neon` is each lane's glowing rail colour, listed front row first, left to
   // right as seen from the spawn; `req`/`power` are the lock tags over the
@@ -272,9 +271,9 @@ export const SHOPS = {
 // --- Hub pads (hub.js) ----------------------------------------------------------------
 // A glowing touch pad in front of each shop object; driving onto one opens its
 // window (once per visit: leave the pad to re-arm it). `open` names the window
-// main.js passes in; keep them on open sand (the pink walkway runs past the Eggs
+// main.js passes in; keep them on the open yard (the boardwalk runs past the Eggs
 // stall's front, x > 17). Pets = the Eggs stall, Horses = the Horses stall, Engine =
-// the Engine Upgrade machine, Partner = the hero statues on the right walkway.
+// the Engine Upgrade machine, Partner = the hero statues on the right boardwalk.
 export const HUB = {
   radius: 2.6, // m: the pad's size and its trigger distance from the horse's centre
   beamHeight: 1.8, // m of glowing light wall round the rim
@@ -363,7 +362,7 @@ export const HORSES = {
 
 // A wooded hill out in the meadow, seen past the stall in the east view (the Frontier Town's
 // water tower stands on top). trees: [x, z, height] from its centre.
-export const ISLET = { x: 115, z: -40, hill: { rx: 36, ry: 9, rz: 24 }, trees: [[-6, -3, 12], [5, 4, 10], [12, -6, 9], [-14, 6, 8]] }
+export const HILL = { x: 115, z: -40, hill: { rx: 36, ry: 9, rz: 24 }, trees: [[-6, -3, 12], [5, 4, 10], [12, -6, 9], [-14, 6, 8]] }
 
 // --- Player horse (horse.js) -----------------------------------------------------
 export const HORSE = {
@@ -420,7 +419,7 @@ export const TIME_OF_DAY = {
     zenith: '#1576f0',
     horizon: '#a9e2ff',
     sunColor: '#fff4de',
-    // Sun + hemi + env together keep the pale sand (#eed39c) near its own tan;
+    // Sun + hemi + env together keep the pale dirt and grass near their own colours;
     // much more and ACES washes it (and the props) out to grey-white.
     sunIntensity: 2.4,
     sunElevation: 55, // degrees above the horizon
@@ -462,7 +461,7 @@ export const LIGHT = {
 // meadow tint, sky, the far horizon, the plaza's cliffs, the trees, the pump and the hill. The VIP portal on the plaza
 // (PLAZA.vip) moves the player between them: to a world with `req` once the player
 // has that many rebirths and that much Power (lightning) at the same time (after that
-// it stays open, saved by the server), back to the beach at any time.
+// it stays open, saved by the server), back to the ranch at any time.
 export const WORLDS = {
   start: 'beach',
   // Driving into this circle (radius m, `dz` m from the dais centre toward the spawn) uses the portal.
@@ -596,7 +595,7 @@ export const REBIRTH = {
 export const TRAIN = {
   tick: 1,
   autoRate: 0.5,
-  popupSeconds: 1.1, // the "+N" bolt floating off the boat
+  popupSeconds: 1.1, // the "+N" bolt floating off the horse
 }
 
 // --- Pets (pets.js) ----------------------------------------------------------------
@@ -636,9 +635,9 @@ export const PETS = {
 }
 
 // --- Pets + partner in the world (companions.js) ----------------------------------------
-// Equipped pets hover in these slots round the boat (boat frame: +Z = forward, metres; the
+// Equipped pets hover in these slots round the horse (horse frame: +Z = forward, metres; the
 // first ones beside the stern, the rest further back and higher), bobbing `bob` m and swinging
-// after turns (`turnLag` 1/s). The partner stands on the boat behind the rider.
+// after turns (`turnLag` 1/s). The partner stands on the horse's rump behind the rider.
 export const COMPANIONS = {
   slots: [[-2.1, 0.9, -1.4], [2.1, 0.9, -1.4], [0, 1.4, -3.2], [-2.3, 1.4, -3.5], [2.3, 1.4, -3.5], [-1.2, 1.9, -4.8], [1.2, 1.9, -4.8], [0, 2.3, -5.6]],
   petScale: 0.95,
@@ -899,12 +898,12 @@ export const HUD = {
 }
 
 // --- Race (race.js) ----------------------------------------------------------------
-// Driving through the START gate starts a race: the boat drives itself down the
+// Riding through the START gate starts a race: the horse gallops itself down the
 // buoy lane (A/D or the joystick steer inside it) until `duration` runs out or
 // the player taps Leave. Speeds and distances are in studs; the world moves
 // `metresPerStud` m per stud. Top speed = (baseSpeed + speedPerBolt * lightning)
-// x the Acc speed boost (121 bolts -> 145 before boosts, like the reference). Past `cruiseZ` the boat stays put and the
-// lane, sea and trail scroll instead (the sea is only WATER.size wide).
+// x the Acc speed boost (121 bolts -> 145 before boosts, like the reference). Past `cruiseZ` the horse stays put and the
+// track, meadow and trail scroll instead (the meadow is only GROUND.size wide).
 // --- Race track (track.js) ----------------------------------------------------------------
 // The dirt track past the START gate, the lobby's short one and the race's long one: a dirt strip
 // `margin` m wider than the gate either side, between white rail fences on the gate posts' lines.
@@ -915,10 +914,10 @@ export const TRACK = { postSpacing: 4, tile: 8, margin: 1, postSize: [0.22, 1.35
 export const RACE = {
   baseSpeed: 24,
   speedPerBolt: 1,
-  // Acc (engine x boat engines + boat + partner + trail, boosts.js) also raises top
+  // Acc (engine x horse boosters + horse + partner + trail, boosts.js) also raises top
   // speed: x (1 + accSpeed x acc %). 1 = a "+50% Acc" card is +50% speed; 0 = acceleration only.
   accSpeed: 1,
-  // Luck (boat + partner) gives each checkpoint a chance of paying double ("LUCKY x2"):
+  // Luck (horse + partner) gives each checkpoint a chance of paying double ("LUCKY x2"):
   // luck / (luck + half), at most `max` (20% luck -> 9%, 200% -> 50%).
   luck: { half: 200, max: 0.75 },
   accelTime: 5, // s from 0 to top speed (shortened by the acc boost, boosts.js)
@@ -933,7 +932,7 @@ export const RACE = {
   lane: { length: 700 }, // race track past the gate (track.js; replaces the lobby's while racing)
   // Scenery streaming past the lane (raceScenery.js): set pieces built once and recycled. One comes
   // every `gap` m (random in the range, mostly alternating sides) from `first` m past the gate; each
-  // appears `ahead` m in front of the boat (inside the fog) and is recycled `behind` m behind it. An
+  // appears `ahead` m in front of the horse (inside the fog) and is recycled `behind` m behind it. An
   // arch spans the lane every `archEvery` m from `archFirst`. Per kind: `weight` (how often it comes up),
   // `x` = distance from the lane's centre line (m, either side), `y` = height (balloons).
   // The start island slides away with the scroll and is hidden once `homeHide` m gone (past the fog).
@@ -960,9 +959,9 @@ export const RACE = {
     rainbow: ['#ff2a2a', '#ff8a1a', '#ffe11a', '#22d34a', '#1a9cff', '#3a3cff', '#a01aff'],
   },
   // Chase cam: behind and above, looking a little down the lane.
-  // `compact` (portrait, or under compactHeight px tall) looks further down so the boat sits above the speedometer.
-  // `orbit`: drag (mouse, or the touch look zone) swings the cam around the boat at `pivot` m above
-  // it; pitch is the boom's angle above the horizon, kept in min..max (min keeps it above the water).
+  // `compact` (portrait, or under compactHeight px tall) looks further down so the horse sits above the speedometer.
+  // `orbit`: drag (mouse, or the touch look zone) swings the cam around the horse at `pivot` m above
+  // it; pitch is the boom's angle above the horizon, kept in min..max (min keeps it above the ground).
   camera: { distance: 13, height: 5.2, lookAhead: 14, lookHeight: 0.6, fov: 72, speedFov: 14, follow: 8, compactHeight: 500, compact: { distance: 15, height: 6.5, lookHeight: -4.5 }, orbit: { pivot: 1.2, minPitch: 0.06, maxPitch: 1.2 } },
   // Checkpoints: pale see-through walls across the lane (the last one passed +
   // the next `ahead - 1` are drawn). Spacing is picked per race from the top
@@ -976,7 +975,7 @@ export const RACE = {
   // (Wins per hour ~ 45 x speed^2 x 3600 / 1M at any speed; a new player's 2.5M-stud race ~29K),
   // instead of growing with the square of a 2 h race's distance,
   // x the Wins boost (boosts.js): a trophy "+N" pops by the studs callout, `trophies` trophy icons
-  // fly from the boat into the trophy counter (each adds its share as it lands)
+  // fly from the horse into the trophy counter (each adds its share as it lands)
   // and confetti rains down (`confetti` pieces, `confettiTouch` on touch screens).
   checkpoint: { early: [10, 25, 50, 100, 250, 500], seconds: 7, paySeconds: 45, steps: [100, 250, 500, 1e3, 2.5e3, 5e3, 1e4, 2.5e4, 5e4, 1e5, 2.5e5, 5e5, 1e6], ahead: 4, wallHeight: 36, color: '#e4fbff', opacity: 0.5 },
   reward: { trophies: [3, 7], flight: 1.15, stagger: 0.09, popup: 2.2, confetti: 70, confettiTouch: 36, colors: ['#ff2a2a', '#ffe11a', '#22d34a', '#1a3cff'] },
@@ -995,7 +994,7 @@ export const RACE = {
 // The Engine window's catalog. Everything but the free Basic Engine is bought with
 // Wins (the HUD's trophy counter). Grid order: the three gem engines (red NEW
 // cards), the Basic Engine, then the 30-engine ladder, one card colour per row of 4.
-// stats are % boosts: wins, acc (boat acceleration), train (training gains).
+// stats are % boosts: wins, acc (horse acceleration), train (training gains).
 // look colours the card art: kind 'rocket' | 'missile' | 'jet' | 'ship' | 'satellite'.
 export const ENGINE = {
   starter: {
@@ -1061,7 +1060,7 @@ export const ENGINE = {
 // partner is bought with Wins (the HUD's trophy counter). The first row are the
 // premium partners (red NEW ribbon), priced by performance against the ladder
 // below them (whose prices grow ~8x per step). stats are % boosts: wins, luck,
-// acc (boat acceleration). tint colours the name in the side panel. look
+// acc (horse acceleration). tint colours the name in the side panel. look
 // dresses the blocky portrait (partner.js): hair/hat, face, shirt pattern, colours.
 export const PARTNER = {
   featured: 'hacker', // shown when the window opens
@@ -1137,10 +1136,10 @@ export const TRAILS = {
     { id: 'toxic', name: 'Toxic', rebirth: 45, stats: { wins: 1500, acc: 1400 }, look: { texture: 'toxic' } },
     { id: 'waterRipple', name: 'Water Ripple', rebirth: 50, stats: { wins: 1550, acc: 1840 }, look: { texture: 'ripple', add: true } },
   ],
-  // The ribbon behind the horse (trail.js): a band fed from just behind the hind hooves (`stern` m
+  // The ribbon behind the horse (trail.js): a band fed from just behind the hind hooves (`back` m
   // back, `height` m up) that turns to face the camera (upright seen from the side, flat on the
   // ground from behind), fading out over its life. width/tile are the defaults per look.
-  ribbon: { points: 72, life: 0.9, spacing: 0.35, width: 0.7, tile: 2.4, opacity: 0.95, height: 0.04, stern: 1.0 },
+  ribbon: { points: 72, life: 0.9, spacing: 0.35, width: 0.7, tile: 2.4, opacity: 0.95, height: 0.04, back: 1.0 },
   // The scene's showcase: the horse galloping in place on the meadow off the east wing, broadside
   // to a low camera that looks back at the ranch yard and cliffs (like the reference).
   // view = horizontal direction the camera looks; the horse faces the camera's right. horseWidth =

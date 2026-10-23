@@ -1,5 +1,5 @@
 import { CanvasTexture, DoubleSide, Mesh, MeshBasicMaterial, PlaneGeometry, Vector3 } from 'three'
-import { BEACH, CAMERA, clamp, FOG, GROUND, HUD, LOBBY, RACE, TRACK } from './config.js'
+import { YARD, CAMERA, clamp, FOG, GROUND, HUD, LOBBY, RACE, TRACK } from './config.js'
 import { remoteRacers, sendRace } from './net.js'
 import { inputState, isLocked } from './input.js'
 import { getCameraSensitivity } from './camera.js'
@@ -82,7 +82,7 @@ export function createRace({ scene, hud, lobby, world, home, onEnd }) {
   scene.add(lane)
   const walls = buildWalls(scene)
   const scenery = createRaceScenery(scene, home) // farms, windmills, arches... streaming past the track
-  // next: index of the next checkpoint; sx, sy: the boat on screen (px), where the reward trophies start.
+  // next: index of the next checkpoint; sx, sy: the horse on screen (px), where the reward trophies start.
   // boost: boosts() when the race started; lastTop: the previous race's top speed (for the speed-up banner);
   // step / early: this race's checkpoint spacing and the early checkpoints below it; best: the personal best
   // (studs), record: this race has passed it; boostTap: the tap boost (0..RACE.tap.max);
@@ -159,7 +159,7 @@ export function createRace({ scene, hud, lobby, world, home, onEnd }) {
     s.x = s.camX = clamp(player.position.x, -halfLane, halfLane)
     s.y = player.position.y
     s.z = Math.min(player.position.z, G.z)
-    s.sx = window.innerWidth / 2 // until the race cam projects the boat
+    s.sx = window.innerWidth / 2 // until the race cam projects the horse
     s.sy = window.innerHeight * 0.55
     lobby.setLaneVisible(false)
     lane.visible = true
@@ -225,10 +225,10 @@ export function createRace({ scene, hud, lobby, world, home, onEnd }) {
         tap()
       }
       s.boostTap *= Math.exp(-RACE.tap.decay * dt)
-      const speed = s.speed * (1 + s.boostTap) // what the boat actually does
+      const speed = s.speed * (1 + s.boostTap) // what the horse actually does
       s.studs += speed * dt
 
-      // Forward: the boat itself until the cruise point, then the world.
+      // Forward: the horse itself until the cruise point, then the world.
       const metres = speed * RACE.metresPerStud * dt
       s.z -= metres
       let scrolled = 0
@@ -239,7 +239,7 @@ export function createRace({ scene, hud, lobby, world, home, onEnd }) {
       }
       s.x = clamp(s.x + inputState.move.x * RACE.steerSpeed * dt, -halfLane, halfLane)
       // Off the pad and onto the track.
-      const yTarget = s.z < BEACH.front ? TRACK_Y : 0
+      const yTarget = s.z < YARD.front ? TRACK_Y : 0
       s.y += (yTarget - s.y) * (1 - Math.exp(-6 * dt))
       player.position.x = player.renderPosition.x = s.x
       player.position.y = player.renderPosition.y = s.y
@@ -264,7 +264,7 @@ export function createRace({ scene, hud, lobby, world, home, onEnd }) {
         ui.record()
       }
       // The last wall passed (until it is behind the camera) and the next few
-      // ahead of the boat (hidden past the fog).
+      // ahead of the horse (hidden past the fog).
       walls.forEach((w, i) => {
         const k = s.next - 1 + i
         const ahead = k < 0 ? -Infinity : (checkpointAt(k) - s.studs) * RACE.metresPerStud
@@ -277,14 +277,14 @@ export function createRace({ scene, hud, lobby, world, home, onEnd }) {
       if (s.studs >= RACE.finish) finish()
       return dt > 0 ? scrolled / dt : 0
     },
-    // Boat speed in m/s (engine flames, tilt).
-    boatSpeed: () => s.speed * (1 + s.boostTap) * RACE.metresPerStud,
+    // Horse speed in m/s (gait, booster flames, hoofbeats).
+    horseSpeed: () => s.speed * (1 + s.boostTap) * RACE.metresPerStud,
     // Top speed this race in m/s (engine sound).
     topSpeed: () => s.top * RACE.metresPerStud,
     // 0..RACE.tap.max: the tap boost right now (engine flames).
     tapBoost: () => s.boostTap,
-    // Chase cam: behind the boat and above it, looking down the lane. Dragging
-    // (mouse, or the touch look zone) swings it around the boat; the framing
+    // Chase cam: behind the horse and above it, looking down the track. Dragging
+    // (mouse, or the touch look zone) swings it around the horse; the framing
     // turns with it, so at yaw = pitch = 0 it is the plain chase shot. The wheel /
     // pinch zooms the boom (CAMERA.minDistance..maxDistance, like camera.js) and
     // crosses into first person at its inner end; V / CAM toggle first person too.
@@ -295,7 +295,7 @@ export function createRace({ scene, hud, lobby, world, home, onEnd }) {
       s.yaw -= inputState.look.dx * k
       s.pitch += inputState.look.dy * k
       inputState.look.dx = inputState.look.dy = 0
-      // Boom from a pivot above the boat: the chase offset in polar form, plus the drag.
+      // Boom from a pivot above the horse: the chase offset in polar form, plus the drag.
       const py = s.y + ORBIT.pivot
       const up = C.height - ORBIT.pivot
       s.reach = Math.hypot(up, C.distance)
@@ -311,7 +311,7 @@ export function createRace({ scene, hud, lobby, world, home, onEnd }) {
         inputState.zoom = 0
       }
       if (isFirstPerson()) {
-        // The rider's eyes, steady on the boat (no follow lag: it reads as input delay).
+        // The rider's eyes, steady on the horse (no follow lag: it reads as input delay).
         s.pitch = clamp(s.pitch, -CAMERA.firstPersonPitch, CAMERA.firstPersonPitch)
         const eyeY = s.y + player.dims.height * CAMERA.eyeHeight
         const cp = Math.cos(s.pitch)
