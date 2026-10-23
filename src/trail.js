@@ -43,7 +43,7 @@ export function createTrail(scene, horseRoot) {
   geo.setDrawRange(0, 0)
   const mesh = new Mesh(geo)
   mesh.frustumCulled = false // the points move every frame
-  mesh.renderOrder = 3 // over the ground, the track and the engine glow
+  mesh.renderOrder = 3 // over the ground and the track
   mesh.visible = false
   scene.add(mesh)
 

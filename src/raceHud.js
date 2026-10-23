@@ -1,13 +1,13 @@
 // In-race HUD pieces from the reference screenshot, added to the main HUD
 // (hud.js) while a race runs (race.js):
 //   - speedometer under the horse: rainbow arc, 0 / quarter / top-speed ticks,
-//     white needle, current speed
+//     white needle, current speed in km/h
 //   - "↑ 770 Studs" distance callout to its upper right
 //   - the red Leave button to its right
 //     (Leave sits left of the gauge on touch, clear of JUMP/RUN/CAM)
 //   - white speed streaks at the screen edges, stronger the faster you go
 //   - the result card when the race ends
-//   - "Top Speed 145 -> 236!" when a race starts faster than the last one (training paid off),
+//   - "Top Speed 52 -> 56 km/h!" when a race starts faster than the last one (training paid off),
 //     "NEW RECORD!" when the race passes the personal best
 //   - "Next 🏆+9 at 9K" under the studs callout: the next checkpoint and its pay
 //   - tap boost: "TAP!" inside the speedometer arc until you tap, then "+18%";
@@ -85,7 +85,7 @@ function gaugeSvg() {
     .join('')
   // The needle sits in a shaker group: CSS jitters the group, the needle's own transform turns it.
   const needle = `<g class="g-shake"><g class="g-needle" transform="rotate(180 ${CX} ${CY})"><path d="M${CX} ${CY - 11}L${CX + R1 - 8} ${CY}L${CX} ${CY + 11}z" fill="#fff" stroke="#1b1b2a" stroke-width="4" stroke-linejoin="round"/></g></g>`
-  const speed = `<text class="g-speed" x="${CX}" y="${CY + 12}" text-anchor="middle">0</text>`
+  const speed = `<text class="g-speed" x="${CX}" y="${CY}" text-anchor="middle">0</text><text class="g-unit" x="${CX}" y="${CY + 24}" text-anchor="middle">km/h</text>`
   const boost = `<text class="g-boost" x="${CX}" y="${CY - 56}" text-anchor="middle">TAP!</text>`
   return `<svg viewBox="0 0 340 200" aria-hidden="true">${wedges}${outline}${ticks}${boost}${needle}${speed}</svg>`
 }
@@ -252,8 +252,8 @@ export function createRaceHud(hud, { onLeave }) {
         lines.style.setProperty('--speed', 0)
       }
     },
-    // ms on the race clock, speed and top speed (studs/s), distance (studs), tap boost (0..RACE.tap.max).
-    setInfo({ ms, speed, top, studs: d, boost = 0 }) {
+    // ms on the race clock, speed and top speed (km/h), distance (studs), tap boost (0..RACE.tap.max).
+    setInfo({ ms, kmh: speed, top, studs: d, boost = 0 }) {
       const pct = Math.round(boost * 100)
       if (pct !== shownBoost) {
         shownBoost = pct
@@ -275,7 +275,7 @@ export function createRaceHud(hud, { onLeave }) {
       }
       const s = `${short(d)} Studs`
       if (s !== shownStuds) studsText.textContent = shownStuds = s
-      lines.style.setProperty('--speed', Math.min(1, (speed * RACE.metresPerStud) / 32).toFixed(2))
+      lines.style.setProperty('--speed', Math.min(1, speed / 70).toFixed(2)) // full streaks at a racing gallop
     },
     // A tap at (x, y) px: a ripple there.
     tapAt(x, y) {
@@ -302,7 +302,9 @@ export function createRaceHud(hud, { onLeave }) {
       }
     },
     speedUp(from, to) {
-      banner(`Top Speed ${Math.round(from)} → ${Math.round(to)}!`, 'bolt', false)
+      // A small gain shows its tenths, so it never reads "56 -> 56".
+      const n = (v) => (Math.round(from) === Math.round(to) ? v.toFixed(1) : Math.round(v))
+      banner(`Top Speed ${n(from)} → ${n(to)} km/h!`, 'bolt', false)
       sfx.speedUp()
     },
     record() {

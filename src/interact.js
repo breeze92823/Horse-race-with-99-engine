@@ -9,16 +9,15 @@ import { anyWindowOpen, replay } from './uiWindow.js'
 // ("E  Sunny Egg / Hatch 🏆30"). E (or tapping the pill, the touch path) runs it:
 //  - eggs (Eggs stall): open that egg's window (eggs.js: odds, Open 1 / N, Auto,
 //    the hatch overlay)
-//  - display horses (Horses stall), rocket engines (pads), hero statues
-//    (partners): buy if not owned, then equip, straight from the world
-//  - Engine Upgrade machine: buy + equip the next ladder engine
+//  - display horses (Horses stall), the partners on the Partner stage: buy if not
+//    owned, then equip, straight from the world
 //  - hub pads (hub.js): open the pad's window again without driving off it
 // In portrait the HUD's side columns cover the middle of the screen, so the
 // pill docks centred just above the distance bars instead of over the object.
 // Not enough Wins = the pill shakes + "Need N more Wins!". Prompts are off
 // while racing / in the Trails scene (pos null) and while a window is open.
 // deps: { hud (getStat/setStat), lobby, shops (their `spots`), eggs (the egg window), horses,
-// engine, partner (the windows' item/acquire APIs), windows (hub pad openers) }.
+// partner (the windows' item/acquire APIs), windows (hub pad openers) }.
 const SUFFIXES = ['', 'K', 'M', 'B', 'T', 'Qa', 'Qi', 'Sx', 'Sp', 'Oc', 'No', 'Dc']
 export function short(n) {
   n = Math.floor(n)
@@ -31,7 +30,7 @@ export function short(n) {
   return `${n >= 100 ? Math.floor(n + 1e-6) : Math.floor(n * 10 + 1e-6) / 10}${SUFFIXES[i]}`
 }
 
-export function createInteract({ hud, lobby, shops, eggs, horses, engine, partner, windows }) {
+export function createInteract({ hud, lobby, shops, eggs, horses, partner, windows, extra = [] }) {
   const wins = () => hud.getStat('trophies')
   const hotbar = hud.root.querySelector('.hud-bars')
 
@@ -89,6 +88,7 @@ export function createInteract({ hud, lobby, shops, eggs, horses, engine, partne
     const name = pad.name[0] + pad.name.slice(1).toLowerCase()
     targets.push({ x: pad.x, y: 2.2, z: pad.z, r: HUB.radius, info: () => ({ title: name, verb: 'Open' }), run: () => windows[pad.open]?.() })
   }
+  targets.push(...extra) // e.g. the world portals (worlds.js)
   for (const spot of shops.spots.eggs) {
     const egg = spot.egg
     targets.push({
@@ -99,30 +99,7 @@ export function createInteract({ hud, lobby, shops, eggs, horses, engine, partne
     })
   }
   for (const spot of shops.spots.horses) if (spot.horse) targets.push(shopTarget(spot, INTERACT.radius.horse, horses, spot.horse))
-  for (const spot of lobby.spots.rockets) if (spot.engine) targets.push(shopTarget(spot, INTERACT.radius.rocket, engine, spot.engine))
   for (const spot of lobby.spots.statues) if (spot.partner) targets.push(shopTarget(spot, INTERACT.radius.statue, partner, spot.partner))
-  for (const spot of lobby.spots.upgrade) {
-    targets.push({
-      ...spot,
-      r: INTERACT.radius.upgrade,
-      info() {
-        const id = engine.nextUpgrade()
-        if (!id) return { title: 'Engine Upgrade', verb: 'Max level!', off: true }
-        const it = engine.item(id)
-        return { title: it.name, verb: 'Upgrade', price: it.price }
-      },
-      // The new engine is only equipped if it beats the equipped one (a gem engine may).
-      run() {
-        const id = engine.nextUpgrade()
-        if (!id) return
-        const it = engine.item(id)
-        const better = it.stats.wins > engine.boost().wins
-        const r = engine.acquire(id, better)
-        if (r.done === 'bought' && !better) say(`Bought ${it.name}! Kept your stronger engine`, true)
-        else report(r, it.name)
-      },
-    })
-  }
 
   // --- Per frame ----------------------------------------------------------------------
   let active = null

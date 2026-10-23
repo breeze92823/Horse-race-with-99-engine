@@ -1,13 +1,13 @@
-// Worlds: the VIP portal on the plaza takes the player between the ranch and the
-// Frontier Town (WORLDS in config; ids `beach` and `city`, as saved). Both are the
+// Worlds: the portals (the VIP arch on the plaza, the snow arch left of the RACE arch)
+// take the player between the ranch and the Frontier Town (WORLDS in config; ids `beach` and `city`, as saved). Both are the
 // same start island with the same shops, tracks, races and progress; only the
-// scenery, meadow tint and sky change (environment.js, town.js, lighting.setMoods). Driving into the portal (a circle in front of its
-// dais, so it works the same on touch) goes to the other world when it is open:
+// scenery, meadow tint and sky change (environment.js, town.js, lighting.setMoods). Standing in the portal's circle (in front of its
+// dais) shows an "Enter" prompt; E (or tapping the prompt, interact.js) goes to the other world when it is open:
 // a world with `req` opens once the player has that many rebirths and that much
 // Power (lightning) at once, and from then on stays open (saved: `worldsUnlocked`);
 // the way back is always open. Locked = a toast with what is missing and a deny
-// knock; one try per visit (drive out of the circle to try again). The board over
-// the arch shows the destination and each requirement in green (met) or red.
+// knock; one try per visit (drive out of the circle to try again). Each portal's sign
+// shows the destination and each requirement in green (met) or red.
 // The current world is saved (`world`) and sent with the loadout, so remote
 // players in another world are not drawn (remotePlayers.js, net.js).
 // VITE_DEV_WORLDS=true (dev server only) skips the requirement and doesn't save the unlock.
@@ -22,14 +22,14 @@ const IDS = Object.keys(WORLDS.list)
 const OK = '#7dff6a'
 const MISSING = '#ff6b6b'
 
-// deps: { hud (root), plaza (setPortal), env (show), world (setGround), lighting (setMoods),
-//   stats() -> { rebirths, power }, leave() (end a race / the Trails scene first), respawn() }
+// deps: { hud (root), plaza (setPortal), portals ([{ x, z, setSign }] more portals: lobby.js),
+//   env (show), world (setGround), lighting (setMoods), stats() -> { rebirths, power },
+//   leave() (end a race / the Trails scene first), respawn() }
 export function createWorlds(deps) {
   const { hud, plaza, env, world, lighting } = deps
   const P = WORLDS.portal
-  const cx = PLAZA.vip.x
-  const cz = PLAZA.vip.z + P.dz
-  let armed = true
+  // Each portal: where driving in uses it, its sign, and whether it has been left since its last try.
+  const portals = [{ x: PLAZA.vip.x, z: PLAZA.vip.z + P.dz, setSign: plaza.setPortal }, ...(deps.portals ?? [])].map((p) => ({ ...p, armed: true }))
   let busy = false // between the flash and the swap
   let signIn = 0
 
@@ -66,7 +66,7 @@ export function createWorlds(deps) {
       const row = (icon, name, have, need) => (have >= need ? [`${icon} ${name}: ${need} ✔`, OK] : [`${icon} ${name}: ${Math.floor(have)}/${need}`, MISSING])
       lines.push(row('●', 'Rebirth', st.rebirths, def.req.rebirths), row('⚡', 'Power', st.power, def.req.power))
     }
-    plaza.setPortal(lines, isOpen(id, st))
+    for (const p of portals) p.setSign(lines, isOpen(id, st))
   }
 
   // Shows world `id` at once: its scenery, ground and sky; the portal now leads back.
@@ -115,16 +115,21 @@ export function createWorlds(deps) {
 
   return {
     // pos: the player's feet, or null while racing / in the Trails scene (the portal is off).
-    update(dt, pos) {
+    update(dt) {
       if ((signIn -= dt) <= 0) {
         signIn = 0.5
         refreshSign()
       }
-      if (!pos || busy) return
-      const inside = Math.hypot(pos.x - cx, pos.z - cz) < P.radius
-      if (inside && armed) use()
-      armed = !inside
     },
+    // Interact prompts (interact.js): travelling needs E (or a tap on the prompt), never just driving in.
+    spots: portals.map((p) => ({
+      x: p.x,
+      y: 3,
+      z: p.z,
+      r: P.radius,
+      info: () => ({ title: WORLDS.list[destination()].name, verb: 'Enter' }),
+      run: () => busy || use(),
+    })),
     // net.js: the current world and the worlds opened so far.
     snapshot: () => ({ world: worldState.current, worldsUnlocked: [...worldState.unlocked] }),
     hydrate(doc) {

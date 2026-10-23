@@ -1,5 +1,5 @@
 // Partner window (the reference's "Partner!" popup) on the shared window shell
-// (uiWindow.js), laid out like the Engine window. Left: a blue panel with the
+// (uiWindow.js), laid out like the Horses window. Left: a blue panel with the
 // selected partner's name (in its tint), a big portrait, its boosts and one
 // action button (Wins price / Equip / Unequip). Right: a scrolling 4-column grid
 // of round portrait cards: the premium row (red NEW ribbon), then the ladder;
@@ -34,17 +34,58 @@ const ICONS = {
 // the body is clipped to the disc, the head rises above its top edge. viewBox
 // 0 0 100 116, disc centre (50, 63), radius 46.5. Pieces are picked by `look`.
 
-// Hair / headwear drawn behind the head (pigtails, hood, cowl ears).
+// A hex colour darkened (k < 1) or lightened toward white (k > 1): hair strands, shading.
+function shade(hex, k) {
+  const n = parseInt(hex.slice(1), 16)
+  const f = (c) => Math.round(k < 1 ? c * k : c + (255 - c) * (k - 1))
+  return `rgb(${f(n >> 16)},${f((n >> 8) & 255)},${f(n & 255)})`
+}
+
+// Star polygon round (cx, cy): n points between radius r (inner) and R (outer).
+function spikes(cx, cy, r, R, n) {
+  let d = ''
+  for (let i = 0; i < n * 2; i++) {
+    const a = (i * Math.PI) / n
+    const k = i % 2 ? r : R
+    d += `${i ? 'L' : 'M'}${(cx + Math.sin(a) * k).toFixed(1)} ${(cy - Math.cos(a) * k).toFixed(1)} `
+  }
+  return d + 'Z'
+}
+
+// Little four-point sparkles at [x, y, size] (Elsa's ice, Grace's gold).
+const sparkles = (color, pts) =>
+  pts.map(([x, y, s]) => `<path d="M${x} ${y - s} Q${x} ${y} ${x + s} ${y} Q${x} ${y} ${x} ${y + s} Q${x} ${y} ${x - s} ${y} Q${x} ${y} ${x} ${y - s} Z" fill="${color}" opacity=".9"/>`).join('')
+
+// Hair / headwear drawn behind the head (bob, bun, pigtails, hood, cowl ears, mane).
 function behindHead(l) {
+  let out = ''
+  if (l.mane) out += `<path d="${spikes(50, 25, 17, 25, 12)}" fill="${l.mane}" ${O}/><path d="${spikes(50, 25, 14, 20, 12)}" fill="${shade(l.mane, 1.3)}"/>`
+  if (l.hair === 'bob') out += `<path d="M31 14 H69 V40 Q50 44 31 40 Z" fill="${l.hairColor}" ${O}/>`
+  if (l.hair === 'bun')
+    out += `<circle cx="50" cy="6" r="8" fill="${l.hairColor}" ${O}/><path d="M44.5 4 Q50 0.5 55.5 4 M45 8 Q50 5 55 8" fill="none" stroke="${shade(l.hairColor, 0.7)}" stroke-width="1.2"/>`
+  if (l.tufts)
+    out += `<g ${O}><path d="M34 15 Q24 10 21 18 Q24 25 33 21 Z" fill="${l.hairColor}"/><path d="M66 15 Q76 10 79 18 Q76 25 67 21 Z" fill="${l.hairColor}"/>
+      <circle cx="32" cy="18" r="2.6" fill="${l.tufts}"/><circle cx="68" cy="18" r="2.6" fill="${l.tufts}"/></g>`
   if (l.hair === 'pigtails')
-    return `<g ${O}>
+    out += `<g ${O}>
       <path d="M33 18 Q20 22 21 40 Q24 48 30 44 Q28 30 35 24 Z" fill="${l.hairColor}"/>
       <path d="M67 18 Q80 22 79 40 Q76 48 70 44 Q72 30 65 24 Z" fill="${l.hairColor}"/>
       <path d="M21.5 36 Q24 48 30 44 Q28.5 39 29 34 Z" fill="${l.tipA}"/>
       <path d="M78.5 36 Q76 48 70 44 Q71.5 39 71 34 Z" fill="${l.tipB}"/></g>`
-  if (l.hat === 'mask' || l.hat === 'hood') return `<rect x="31" y="6" width="38" height="38" rx="10" fill="${l.hood ?? l.hatColor}" ${O}/>`
-  if (l.hat === 'cowl')
-    return `<path d="M36 14 L37 1 L44 11 Z M64 14 L63 1 L56 11 Z" fill="${l.hatColor}" ${O}/>`
+  if (l.hat === 'mask' || l.hat === 'hood') out += `<rect x="31" y="6" width="38" height="38" rx="10" fill="${l.hood ?? l.hatColor}" ${O}/>`
+  if (l.hat === 'cowl') out += `<path d="M36 14 L37 1 L44 11 Z M64 14 L63 1 L56 11 Z" fill="${l.hatColor}" ${O}/>`
+  return out
+}
+
+// Hair that falls behind the body (long, curly, side braid, twin braids).
+function backHair(l) {
+  const c = l.hairColor
+  if (l.hair === 'long' || l.hair === 'curly') {
+    let out = `<path d="M30 14 H70 V76 Q50 82 30 76 Z" fill="${c}" ${O}/>`
+    if (l.hair === 'curly') for (const y of [30, 42, 54, 66]) out += `<circle cx="29" cy="${y}" r="5" fill="${c}" ${O}/><circle cx="71" cy="${y}" r="5" fill="${c}" ${O}/>`
+    return out
+  }
+  if (l.hair === 'braid' || l.hair === 'twinbraids') return `<path d="M30 14 H70 V46 Q50 52 30 46 Z" fill="${c}" ${O}/>`
   return ''
 }
 
@@ -64,7 +105,114 @@ function face(l) {
   if (l.face === 'goggles')
     return `<rect x="34" y="20" width="32" height="4" fill="#1d1d23"/><rect x="38" y="19" width="10" height="9" rx="3" fill="#8fe3ff" ${O}/>
       <rect x="52" y="19" width="10" height="9" rx="3" fill="#8fe3ff" ${O}/>${smile}`
-  return eyes + smile
+  const big = l.face === 'princess' || l.face === 'doll'
+  const doll = l.face === 'doll'
+  const eye = (x) =>
+    big
+      ? `<ellipse cx="${x}" cy="25" rx="${doll ? 3.4 : 2.9}" ry="${doll ? 3.8 : 3.6}" fill="#fff" stroke="${INK}" stroke-width="1"/>
+        <ellipse cx="${x}" cy="25.6" rx="${doll ? 2.7 : 2.1}" ry="${doll ? 3.1 : 2.7}" fill="${l.eyes ?? INK}"/>
+        <circle cx="${x}" cy="25.9" r="1.1" fill="${INK}"/><circle cx="${x + 0.9}" cy="24.1" r="0.9" fill="#fff"/>`
+      : `<ellipse cx="${x}" cy="25" rx="2.2" ry="3" fill="${INK}"/><circle cx="${x + 0.7}" cy="23.9" r="0.8" fill="#fff"/>`
+  const browC = l.hairColor ? shade(l.hairColor, 0.75) : INK
+  const brows =
+    l.face === 'stern'
+      ? `<path d="M40.5 19 L47 21 M53 21 L59.5 19" stroke="${browC}" stroke-width="1.8" stroke-linecap="round"/>`
+      : `<path d="M41 19.6 Q44 ${big ? 17.6 : 18.6} 47 19.4 M53 19.4 Q56 ${big ? 17.6 : 18.6} 59 19.6" fill="none" stroke="${browC}" stroke-width="${big ? 1.2 : 1.6}" stroke-linecap="round"/>`
+  const lashes = l.face === 'princess' ? `<path d="M40.4 23 L38.4 21.6 M41.2 21.4 L40 19.8 M59.6 23 L61.6 21.6 M58.8 21.4 L60 19.8" stroke="${INK}" stroke-width="1.1" stroke-linecap="round"/>` : ''
+  const cheeks = big ? `<ellipse cx="40" cy="30.6" rx="2.6" ry="1.5" fill="#ff7fa8" opacity=".55"/><ellipse cx="60" cy="30.6" rx="2.6" ry="1.5" fill="#ff7fa8" opacity=".55"/>` : ''
+  const nose = `<path d="M49.4 28 Q51 29.4 49.4 30.4" fill="none" stroke="${shade(l.skin, 0.72)}" stroke-width="1" stroke-linecap="round"/>`
+  let mouth = smile
+  if (l.face === 'princess')
+    mouth = `<path d="M46.5 32.4 Q48.3 31.3 50 32.1 Q51.7 31.3 53.5 32.4 Q50 35.8 46.5 32.4 Z" fill="${l.lips ?? '#e0486a'}" stroke="${INK}" stroke-width=".8" stroke-linejoin="round"/>`
+  else if (doll) mouth = `<ellipse cx="50" cy="33.2" rx="2" ry="1.3" fill="#e0486a" stroke="${INK}" stroke-width=".8"/>`
+  else if (l.face === 'stern') mouth = `<path d="M46 33.6 H54" stroke="${INK}" stroke-width="1.8" stroke-linecap="round"/>`
+  else if (l.face === 'smirk') mouth = `<path d="M45 33.4 Q51 35 55.5 31.8" fill="none" stroke="${INK}" stroke-width="1.8" stroke-linecap="round"/>`
+  return eye(44) + eye(56) + lashes + brows + cheeks + nose + mouth
+}
+
+// The mask's mark: a guard's circle / triangle / square, Front Man's facets, the VIP's lion.
+function maskMark(l) {
+  const W = 'fill="none" stroke="#f4f4f4" stroke-width="2.6" stroke-linejoin="round"'
+  switch (l.symbol) {
+    case 'none':
+      return ''
+    case 'triangle':
+      return `<path d="M50 18 L57.5 31 H42.5 Z" ${W}/>`
+    case 'square':
+      return `<rect x="43.5" y="18.5" width="13" height="13" ${W}/>`
+    case 'facets':
+      return `<path d="M35 21 L50 17 L65 21 M50 17 V40 M36 31 L50 28 L64 31" fill="none" stroke="#4a4a55" stroke-width="1.2"/>
+        <path d="M39 22.5 L47 21.5 L46 25.5 L40 26 Z M61 22.5 L53 21.5 L54 25.5 L60 26 Z" fill="#000"/>`
+    case 'lion':
+      return `<path d="M40 21.5 L47 23.5 L45.5 26.5 Z M60 21.5 L53 23.5 L54.5 26.5 Z" fill="${INK}"/>
+        <path d="M46 29 H54 L50 33 Z" fill="${shade(l.hatColor, 0.55)}" ${O}/>
+        <path d="M50 33 V35.5 M45.5 37.5 Q50 35 54.5 37.5" fill="none" stroke="${INK}" stroke-width="1.3" stroke-linecap="round"/>
+        <path d="M38 14 Q42 11 46 13 M62 14 Q58 11 54 13" fill="none" stroke="${shade(l.hatColor, 0.6)}" stroke-width="1.4"/>`
+  }
+  return '<circle cx="50" cy="25" r="7" fill="none" stroke="#f4f4f4" stroke-width="2.6"/>'
+}
+
+// Hair over the head, with strands and a shine.
+function hairOver(l) {
+  const c = l.hairColor
+  const dark = shade(c, 0.68)
+  const shine = `<path d="M40 9.6 Q46 7 53 7.6" fill="none" stroke="#fff" stroke-opacity=".45" stroke-width="2" stroke-linecap="round"/>`
+  switch (l.hair) {
+    case 'short':
+      return `<path d="M34 20 Q33 8 45 8 H56 Q67 8 66 20 L63 15 Q55 13 46 14 L38 15 Z" fill="${c}" ${O}/>
+        <path d="M42 10 L40 14.5 M50 9 L48.5 13.6 M58 10 L57.5 14.6" stroke="${dark}" stroke-width="1.2" stroke-linecap="round"/>${shine}`
+    case 'swept':
+      return `<path d="M34 22 Q31 6 48 6 Q62 5 67 13 L66 21 Q60 13 50 14 L38 15 Z" fill="${c}" ${O}/>${shine}`
+    case 'long':
+    case 'curly':
+    case 'braid':
+    case 'twinbraids': {
+      const lock = l.hair === 'long' || l.hair === 'curly' ? 46 : 28
+      let out = `<path d="M34 22 Q31 6 50 6 Q69 6 66 22 L64 15 Q57 11 49 13 Q41 14 36 19 Z" fill="${c}" ${O}/>
+        <path d="M49 7 Q47 10.5 44 13" fill="none" stroke="${dark}" stroke-width="1.2" stroke-linecap="round"/>
+        <rect x="31" y="14" width="6" height="${lock}" rx="3" fill="${c}" ${O}/>
+        <rect x="63" y="14" width="6" height="${lock}" rx="3" fill="${c}" ${O}/>
+        <path d="M34 20 V${12 + lock} M66 20 V${12 + lock}" stroke="${dark}" stroke-width="1" opacity=".7"/>${shine}`
+      const braid = (x) =>
+        [48, 58, 68, 78].map((y) => `<ellipse cx="${x}" cy="${y}" rx="5" ry="6" fill="${c}" ${O}/><path d="M${x - 4} ${y - 2} Q${x} ${y + 2} ${x + 4} ${y - 2}" fill="none" stroke="${dark}" stroke-width="1"/>`).join('') +
+        `<circle cx="${x}" cy="85" r="2.6" fill="${l.ties ?? dark}" ${O}/><path d="M${x - 3} 87 L${x} 94 L${x + 3} 87 Z" fill="${c}" ${O}/>`
+      if (l.hair === 'braid') out += braid(66)
+      if (l.hair === 'twinbraids') out += braid(34) + braid(66)
+      return out
+    }
+    case 'bob':
+      return `<path d="M34 22 Q31 6 50 6 Q69 6 66 22 L64 17 Q50 14 36 17 Z" fill="${c}" ${O}/><rect x="36" y="13" width="28" height="6" fill="${c}"/>
+        <path d="M40 13.5 V18.5 M45 13.5 V19 M50 13.5 V19 M55 13.5 V19 M60 13.5 V18.5" stroke="${dark}" stroke-width="1" stroke-linecap="round"/>${shine}`
+    case 'bun':
+      return `<path d="M34 21 Q32 8 50 8 Q68 8 66 21 L63 16 Q50 12 37 16 Z" fill="${c}" ${O}/>
+        <path d="M35.5 19 Q33.5 25 35.5 31 M64.5 19 Q66.5 25 64.5 31" fill="none" stroke="${c}" stroke-width="2.4" stroke-linecap="round"/>${shine}`
+    case 'pigtails':
+      return `<path d="M34 20 Q34 8 50 8 Q66 8 66 20 Q60 13 52 14 L50 17 L47 14 Q40 13 34 20 Z" fill="${c}" ${O}/>`
+  }
+  return ''
+}
+
+// Headwear over the hair: headband, tiara, bow, flower.
+function headwear(l) {
+  let out = ''
+  if (l.band)
+    out += `<path d="M35.5 15.5 Q50 5 64.5 15.5" fill="none" stroke="${INK}" stroke-width="4.8" stroke-linecap="round"/>
+      <path d="M35.5 15.5 Q50 5 64.5 15.5" fill="none" stroke="${l.band}" stroke-width="3" stroke-linecap="round"/>
+      ${l.gem ? `<circle cx="50" cy="10.2" r="2.2" fill="${l.gem}" ${O}/>` : ''}`
+  if (l.crown)
+    out += `<path d="M40 10 L42 4 L45.5 8 L50 1.5 L54.5 8 L58 4 L60 10 Q50 7.5 40 10 Z" fill="${l.crown}" ${O}/>
+      <circle cx="50" cy="6.6" r="1.7" fill="${l.gem ?? '#ff4f8a'}"/><circle cx="42" cy="4.4" r=".9" fill="#fff"/><circle cx="58" cy="4.4" r=".9" fill="#fff"/>`
+  if (l.bow)
+    out += `<path d="M50 8 L40.5 2.5 L40.5 13.5 Z M50 8 L59.5 2.5 L59.5 13.5 Z" fill="${l.bow}" ${O}/><circle cx="50" cy="8" r="2.4" fill="${shade(l.bow, 0.8)}" ${O}/>`
+  if (l.flower) {
+    const [x, y] = [64, 15]
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2
+      out += `<circle cx="${(x + Math.sin(a) * 3).toFixed(1)}" cy="${(y - Math.cos(a) * 3).toFixed(1)}" r="2.6" fill="${l.flower}" stroke="${INK}" stroke-width="1"/>`
+    }
+    out += `<circle cx="${x}" cy="${y}" r="1.8" fill="#ffd23a"/>`
+  }
+  return out
 }
 
 // Hair / headwear drawn over the head.
@@ -80,8 +228,7 @@ function overHead(l) {
         <rect x="38" y="20" width="24" height="9" rx="3" fill="${l.skin ?? '#f1c9a5'}" ${O}/>
         <ellipse cx="44" cy="24.5" rx="2" ry="2.6" fill="${INK}"/><ellipse cx="56" cy="24.5" rx="2" ry="2.6" fill="${INK}"/>`
     case 'mask':
-      return `<rect x="35" y="10" width="30" height="30" rx="7" fill="${c}" ${O}/>
-        <circle cx="50" cy="25" r="7" fill="none" stroke="#f4f4f4" stroke-width="2.6"/>`
+      return `<rect x="35" y="10" width="30" height="30" rx="7" fill="${c}" ${O}/><rect x="38" y="12" width="15" height="3" rx="1.5" fill="#fff" opacity=".25"/>${maskMark(l)}`
     case 'police':
       return `<path d="M33 16 Q34 6 50 6 Q66 6 67 16 Z" fill="${c}" ${O}/><rect x="33" y="14" width="34" height="5" rx="1.5" fill="#111" ${O}/>
         <path d="M50 8 L53 11 L50 14 L47 11 Z" fill="#ffd23a" ${O}/>`
@@ -99,15 +246,51 @@ function overHead(l) {
       return `<path d="M34 18 Q34 4 50 4 Q66 4 66 18 Z" fill="${c}" ${O}/><path d="M28 17 H72 L70 21 H30 Z" fill="${c}" ${O}/>
         <path d="M46 6 H54 V14 H46 Z" fill="#ffd23a" ${O}/>`
   }
-  switch (l.hair) {
-    case 'short':
-      return `<path d="M34 20 Q33 8 45 8 H56 Q67 8 66 20 L63 15 Q55 13 46 14 L38 15 Z" fill="${l.hairColor}" ${O}/>`
-    case 'swept':
-      return `<path d="M34 22 Q31 6 48 6 Q62 5 67 13 L66 21 Q60 13 50 14 L38 15 Z" fill="${l.hairColor}" ${O}/>`
-    case 'pigtails':
-      return `<path d="M34 20 Q34 8 50 8 Q66 8 66 20 Q60 13 52 14 L50 17 L47 14 Q40 13 34 20 Z" fill="${l.hairColor}" ${O}/>`
-  }
-  return ''
+  return hairOver(l) + headwear(l)
+}
+
+// Outfit details over the torso (x 30..70, y 40..94): crop top, bodice + lacing, neckline,
+// shells, collar, pinafore straps, sash, necklace, tracksuit number, shirt + tie, belt, sparkles.
+function outfit(l) {
+  let out = ''
+  if (l.top) out += `<path d="M30 40 H70 V57 Q50 61 30 57 Z" fill="${l.top}" ${O}/><path d="M30 55 Q50 59 70 55" fill="none" stroke="${shade(l.top, 0.75)}" stroke-width="1.6"/>`
+  if (l.bodice) out += `<path d="M34 44 Q50 50 66 44 L64 82 L50 90 L36 82 Z" fill="${l.bodice}" ${O}/>`
+  if (l.lace) out += `<path d="M46 56 L54 62 M54 56 L46 62 M46 64 L54 70 M54 64 L46 70 M46 72 L54 78 M54 72 L46 78" stroke="${l.lace}" stroke-width="1.5" stroke-linecap="round"/>`
+  if (l.neckline) out += `<path d="M34 40 H66 Q61 49 55 47 Q50 52 45 47 Q39 49 34 40 Z" fill="${l.skin}"/><path d="M34 40.5 Q39 49 45 47 Q50 52 55 47 Q61 49 66 40.5" fill="none" stroke="${INK}" stroke-width="1.4"/>`
+  if (l.shell)
+    out += `<g ${O}><path d="M35 54 Q41 42 49 54 Z" fill="${l.shell}"/><path d="M51 54 Q59 42 65 54 Z" fill="${l.shell}"/></g>
+      <path d="M42 53 L42 47 M38.5 53 L40 48.5 M45.5 53 L44 48.5 M58 53 L58 47 M54.5 53 L56 48.5 M61.5 53 L60 48.5" stroke="${shade(l.shell, 0.65)}" stroke-width="1"/>`
+  if (l.collar) out += `<path d="M38 40 Q42 48 50 42 Q58 48 62 40 Z" fill="${l.collar}" ${O}/>`
+  if (l.straps) out += `<g fill="${l.straps}" ${O}><rect x="37" y="40" width="6" height="26" rx="1"/><rect x="57" y="40" width="6" height="26" rx="1"/><rect x="35" y="62" width="30" height="24" rx="3"/></g>
+      <circle cx="40" cy="64" r="1.6" fill="#fff"/><circle cx="60" cy="64" r="1.6" fill="#fff"/>`
+  if (l.sash) out += `<rect x="30" y="77" width="40" height="7" fill="${l.sash}" ${O}/><path d="M50 80.5 L43 76 V85 Z M50 80.5 L57 76 V85 Z" fill="${l.sash}" ${O}/>`
+  if (l.necklace)
+    out += `<path d="M40 41 Q50 50 60 41" fill="none" stroke="${INK}" stroke-width="3.2"/><path d="M40 41 Q50 50 60 41" fill="none" stroke="${l.necklace}" stroke-width="1.8"/>
+      <circle cx="50" cy="46.8" r="2.4" fill="${l.pendant ?? l.necklace}" stroke="${INK}" stroke-width="1"/>`
+  if (l.number)
+    out += `<rect x="52" y="52" width="16" height="9" rx="1" fill="#fff" stroke="${INK}" stroke-width="1.2"/>
+      <text x="60" y="59" font-size="7" font-weight="700" text-anchor="middle" fill="${INK}" font-family="Fredoka, sans-serif">${l.number}</text>`
+  if (l.tie)
+    out += `<path d="M43 40 L50 54 L57 40 Z" fill="#f4f4f4" ${O}/><path d="M48.4 42 H51.6 L53 64 L50 68 L47 64 Z" fill="${l.tie}" stroke="${INK}" stroke-width="1"/>
+      <path d="M41 40 L46 60 M59 40 L54 60" stroke="${shade(l.color, 0.6)}" stroke-width="1.6"/>`
+  if (l.belt) out += `<rect x="30" y="74" width="40" height="5" fill="${l.belt}"/><rect x="46.5" y="73" width="7" height="7" rx="1" fill="#c9ced8" stroke="${INK}" stroke-width="1.2"/>`
+  if (l.sparkle) out += sparkles(l.sparkle, [[38, 50, 2.2], [61, 58, 1.8], [44, 72, 2], [58, 80, 2.4], [36, 86, 1.6]])
+  return out
+}
+
+// The skirt (visible y 84..108): layers, a draped overskirt, hem trim, mermaid scales, sparkles.
+function skirtArt(l) {
+  if (!l.skirt) return ''
+  let out = `<path d="M30 84 H70 L88 118 H12 Z" fill="${l.skirt}" ${O}/>`
+  if (l.scales)
+    for (let y = 92; y < 112; y += 6) for (let x = 20 + ((y / 6) % 2) * 4; x < 82; x += 8) out += `<path d="M${x - 4} ${y} Q${x} ${y + 5} ${x + 4} ${y}" fill="none" stroke="${shade(l.skirt, 0.7)}" stroke-width="1.2"/>`
+  else out += `<path d="M30 90 L22 118 M50 90 V118 M70 90 L78 118" stroke="#000" stroke-opacity=".12" stroke-width="2"/>`
+  if (l.overskirt)
+    out += `<path d="M30 84 H70 L80 101 Q72 97 65 102 Q57 97 50 102 Q43 97 35 102 Q28 97 20 101 Z" fill="${l.overskirt}" ${O}/>
+      <path d="M38 86 Q36 94 35 101 M50 86 V101 M62 86 Q64 94 65 101" fill="none" stroke="${shade(l.overskirt, 0.82)}" stroke-width="1.4"/>`
+  if (l.hem) out += `<path d="M20 101 Q28 97 35 102 Q43 97 50 102 Q57 97 65 102 Q72 97 80 101" fill="none" stroke="${l.hem}" stroke-width="2.4" stroke-linecap="round"/>`
+  if (l.sparkle) out += sparkles(l.sparkle, [[26, 104, 2], [44, 96, 1.8], [60, 106, 2.2], [74, 98, 1.7]])
+  return out
 }
 
 // Pattern drawn on the torso (x 30..70, y 40..94).
@@ -185,7 +368,10 @@ function arms(l, fill) {
       <rect x="70" y="41" width="15" height="54" rx="4" fill="${fill}" ${O}/>
       ${l.shirt === 'stripes' ? `<g fill="${l.color2}"><rect x="16" y="52" width="13" height="5"/><rect x="71" y="52" width="13" height="5"/><rect x="16" y="66" width="13" height="5"/><rect x="71" y="66" width="13" height="5"/></g>` : ''}
       ${l.shirt === 'code' ? codeMarks(l.color2, 17, 46, 11, 44) + codeMarks(l.color2, 72, 48, 11, 42) : ''}
-      <rect x="16" y="86" width="13" height="8" rx="2" fill="${l.skin}"/><rect x="71" y="86" width="13" height="8" rx="2" fill="${l.skin}"/>`
+      ${l.trim ? `<g fill="${l.trim}"><rect x="15.5" y="43" width="3" height="42"/><rect x="81.5" y="43" width="3" height="42"/></g>` : ''}
+      ${l.sleeves ? `<g fill="${l.sleeves}" ${O}><ellipse cx="22.5" cy="47" rx="10" ry="8"/><ellipse cx="77.5" cy="47" rx="10" ry="8"/></g>
+        <path d="M16 47 Q22.5 42 29 47 M71 47 Q77.5 42 84 47" fill="none" stroke="${shade(l.sleeves, 0.8)}" stroke-width="1.2"/>` : ''}
+      <rect x="16" y="86" width="13" height="8" rx="2" fill="${l.gloves ?? l.skin}"/><rect x="71" y="86" width="13" height="8" rx="2" fill="${l.gloves ?? l.skin}"/>`
 }
 
 let clipIds = 0
@@ -197,14 +383,19 @@ export function partnerArt(look) {
     <defs><clipPath id="${id}"><circle cx="50" cy="63" r="45"/><rect width="100" height="63"/></clipPath></defs>
     <circle cx="50" cy="63" r="46.5" fill="#2c303c" stroke="#c9ced8" stroke-width="3"/>
     <g clip-path="url(#${id})">
-      ${l.cape ? `<path d="M30 41 H70 L86 116 H14 Z" fill="${l.cape}" ${O}/>` : ''}
+      ${l.cape ? `<path d="M30 41 H70 L86 116 H14 Z" fill="${l.cape}" fill-opacity="${l.capeAlpha ?? 1}" ${O}/>` : ''}
+      ${l.cape && l.sparkle ? sparkles(l.sparkle, [[20, 96, 1.8], [80, 90, 2], [84, 104, 1.6]]) : ''}
+      ${backHair(l)}
       <rect x="30" y="92" width="20" height="26" fill="${l.pants}" ${O}/>
       <rect x="50" y="92" width="20" height="26" fill="${l.pants2 ?? l.pants}" ${O}/>
+      ${skirtArt(l)}
       ${l.shirt === 'code' ? codeMarks(l.color2, 32, 96, 36, 16) : ''}
       ${arms(l, l.arms ?? l.color)}
       <rect x="30" y="40" width="40" height="54" rx="2" fill="${l.color}" ${O}/>
       ${torso(l)}
+      ${outfit(l)}
       <rect x="30" y="40" width="40" height="54" rx="2" fill="none" ${O}/>
+      ${l.ddakji ? `<g transform="rotate(-14 22 88)"><rect x="12" y="80" width="15" height="15" fill="#2f63c8" ${O}/><path d="M12 80 L27 95 M27 80 L12 95" stroke="#1d3f8a" stroke-width="1.2"/></g>` : ''}
       ${l.bat ? `<path d="M12 104 L26 60" stroke="#6b3d1f" stroke-width="5" stroke-linecap="round"/><path d="M14 98 L26 60" stroke="#9a5a2c" stroke-width="2.2" stroke-linecap="round"/>` : ''}
       ${l.clipboard ? `<g transform="rotate(-14 30 72)"><rect x="17" y="54" width="25" height="32" rx="2" fill="#d8c9a2" ${O}/>
         <rect x="24" y="51" width="11" height="6" rx="1.5" fill="#8a8f99" ${O}/><path d="M21 64 H38 M21 70 H38 M21 76 H33" stroke="#9a8a66" stroke-width="1.6"/></g>` : ''}

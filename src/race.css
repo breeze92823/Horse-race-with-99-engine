@@ -45,6 +45,11 @@
   fill: #fff;
   stroke-width: 11px;
 }
+.g-unit {
+  font-size: 22px;
+  fill: #fff;
+  stroke-width: 6px;
+}
 .g-needle {
   transition: transform 0.08s linear;
 }

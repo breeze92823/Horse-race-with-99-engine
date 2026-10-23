@@ -4,11 +4,10 @@
 //  - songbirds by day: quick phrases of chirps, sweeps and trills, near and far, either side
 //  - a distant crowd from the grandstands: a murmur that swells into a cheer now and then while
 //    racing, faint in the lobby (louder toward the START gate)
-//  - the waterfall in the plaza: a positional roar (rumble + hiss) that grows as you ride toward it
 //  - crickets at night
 // One scheduler tick (every AUDIO.ambience.tick s) plans the next events ahead of the clock;
 // update() moves the continuous levels every frame.
-import { AUDIO, LOBBY, PLAZA } from '../config.js'
+import { AUDIO, LOBBY } from '../config.js'
 import { A, onStart, ready } from './core.js'
 import { env, rnd, route } from './synth.js'
 
@@ -21,8 +20,6 @@ const s = {
   rustle: null,
   crowd: null, // swell envelope
   crowdLevel: null, // racing / distance level
-  fall: null, // waterfall level + pan
-  fallPan: null,
   nextGust: 0,
   nextBird: 0,
   nextCheer: 0,
@@ -69,12 +66,6 @@ onStart((ctx) => {
   s.crowd.connect(s.crowdLevel)
   loop(A.noise.pinkStereo).connect(filt('bandpass', 650, 0.9)).connect(gain(1)).connect(s.crowd)
   loop(A.noise.pinkStereo).connect(filt('bandpass', 1700, 1.4)).connect(gain(0.5)).connect(s.crowd)
-  // Waterfall: a heavy rumble + broadband hiss, positional.
-  s.fallPan = ctx.createStereoPanner()
-  s.fall = gain(0)
-  s.fall.connect(s.fallPan).connect(bus)
-  loop(A.noise.pinkStereo).connect(filt('bandpass', 1100, 0.35)).connect(gain(0.9)).connect(s.fall)
-  loop(A.noise.brownStereo).connect(filt('lowpass', 220, 0.6)).connect(gain(1.2)).connect(s.fall)
   // Night crickets: each is a sine whose gain is pulsed into chirps by the scheduler.
   for (const [f, pan] of M.crickets) {
     const o = ctx.createOscillator()
@@ -200,13 +191,4 @@ export function update(dt, st) {
   // Crowd: all around while racing; in the lobby faint, louder toward the START gate.
   const toGate = Math.max(0, Math.min(1, 1 - (st.z - LOBBY.gate.z) / 90))
   s.crowdLevel.gain.setTargetAtTime(M.crowd * (st.racing ? 1 : M.crowdLobby * (0.3 + 0.7 * toGate)), t, 0.6)
-  // Waterfall: inverse-distance with a floor so it never pops in; panned from the camera.
-  const W = PLAZA.waterfall
-  const dx = W.x - st.x
-  const dz = W.z - st.z
-  const d = Math.hypot(dx, dz)
-  const fall = st.racing ? 0 : M.waterfall / (1 + Math.pow(d / M.waterfallNear, 2))
-  s.fall.gain.setTargetAtTime(fall, t, 0.25)
-  const pan = d > 0.1 ? (dx * st.rightX + dz * st.rightZ) / d : 0
-  s.fallPan.pan.setTargetAtTime(pan * 0.8, t, 0.15)
 }

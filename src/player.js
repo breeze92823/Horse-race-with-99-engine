@@ -70,6 +70,10 @@ function rotateTowards(from, to, maxDelta) {
   return (from + Math.sign(diff) * maxDelta) % TAU
 }
 
+// Signed shortest angle from `from` to `to`.
+const angleTo = (from, to) => Math.atan2(Math.sin(to - from), Math.cos(to - from))
+const approach = (v, target, maxDelta) => (Math.abs(target - v) <= maxDelta ? target : v + Math.sign(target - v) * maxDelta)
+
 // Moves the (x, z) velocity toward the target as one 2D vector so it curves
 // straight instead of warping axis-by-axis.
 function approach2D(v, targetX, targetZ, maxDelta) {
@@ -104,8 +108,27 @@ function step(dt) {
   const wishZ = (fwdZ * mv.z + rightZ * mv.x) * scale
   const speed = inputState.sprint ? PHYSICS.sprintSpeed : PHYSICS.walkSpeed
 
-  const rate = !player.grounded ? PHYSICS.airAccel : len > 0.01 ? PHYSICS.accel : PHYSICS.decel
-  approach2D(player.velocity, wishX * speed, wishZ * speed, rate * dt)
+  // A horse can't strafe or reverse on the spot: on the ground it runs the way it faces (the facing
+  // swings round below), easing off for a sharp turn so it arcs round, and gathers speed with a
+  // strong first push that tapers toward the top; side-slip is gripped away.
+  const v = player.velocity
+  const wish = Math.hypot(wishX, wishZ)
+  if (player.grounded && wish > 0.01 && !isFirstPerson()) {
+    const fx = Math.sin(player.facing)
+    const fz = Math.cos(player.facing)
+    const diff = angleTo(player.facing, Math.atan2(wishX, wishZ))
+    const target = Math.max(PHYSICS.turnSlow, Math.cos(diff)) * wish * speed
+    let fwd = v.x * fx + v.z * fz
+    let side = v.x * fz - v.z * fx
+    const rate = fwd < target ? PHYSICS.accel * (1 - (PHYSICS.accelTaper * Math.max(0, fwd)) / PHYSICS.sprintSpeed) : PHYSICS.decel
+    fwd = approach(fwd, target, rate * dt)
+    side = approach(side, 0, PHYSICS.grip * dt)
+    v.x = fx * fwd + fz * side
+    v.z = fz * fwd - fx * side
+  } else {
+    const rate = !player.grounded ? PHYSICS.airAccel : len > 0.01 ? PHYSICS.accel : PHYSICS.decel
+    approach2D(v, wishX * speed, wishZ * speed, rate * dt)
+  }
 
   // Jump: buffered a little before landing, and allowed a little after leaving a ledge.
   if (inputState.jump) {
@@ -151,7 +174,10 @@ function step(dt) {
   // The body turns toward its heading; in first person it always faces the view.
   if (isFirstPerson()) player.facing = yaw + Math.PI
   else if (Math.hypot(wishX, wishZ) > 0.05) {
-    player.facing = rotateTowards(player.facing, Math.atan2(wishX, wishZ), PHYSICS.turnSpeed * dt)
+    // Tight on the spot, wider at the gallop.
+    const run = Math.min(1, Math.hypot(v.x, v.z) / PHYSICS.sprintSpeed)
+    const turnRate = PHYSICS.turnSpeed + (PHYSICS.turnSpeedFast - PHYSICS.turnSpeed) * run
+    player.facing = rotateTowards(player.facing, Math.atan2(wishX, wishZ), turnRate * dt)
   }
 }
 

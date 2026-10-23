@@ -1,6 +1,6 @@
 // "Boosts!" window (the HUD's three boost circles open it): where every boost
-// comes from and what it adds up to, so the values in the Engine / Horses /
-// Partner / Trails / Rebirth / Pets windows visibly mean something. One row per
+// comes from and what it adds up to, so the values in the Horses / Partner /
+// Trails / Rebirth / Pets windows visibly mean something. One row per
 // source (boosts.js), the pets' multiplier, a total row, and four summary
 // tiles: race Wins multiplier, top speed, lucky-checkpoint chance, training.
 import './boostPanel.css'

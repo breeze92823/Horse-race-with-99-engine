@@ -1,7 +1,7 @@
 // Game audio, the one import the rest of the game uses:
 //   import { sfx, installAudio, updateAudio } from './audio/index.js'
 // installAudio() once at boot (waits for the first gesture to start), then
-// updateAudio(dt, state) every frame for the horse (hooves, breath, boosters) and
+// updateAudio(dt, state) every frame for the horse (hooves, breath) and
 // the ambience, hoofbeat() from the horse as each hoof lands, and sfx.<name>()
 // for one-shots. Every button press anywhere gets its click here
 // (one capture-phase listener), so menus need no wiring of their own; the
@@ -12,8 +12,9 @@ import * as mount from './mount.js'
 import * as ambience from './ambience.js'
 
 export { sfx, setVolume, setMuted, isMuted, toggleMuted }
-export const engineBlip = mount.blip
-export const engineRev = mount.rev
+// Race taps and the start bring the hooves forward in the mix.
+export const mountBlip = mount.blip
+export const mountRev = mount.rev
 // horse.js onFootfall: one hoof landing (only the player's horse is heard).
 export const hoofbeat = mount.hoof
 

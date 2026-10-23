@@ -60,9 +60,27 @@ function eggArt(egg) {
       spikes += `<polygon points="${at(38, -0.2)} ${at(56, 0)} ${at(38, 0.2)}" fill="${shade(egg.color, -0.2)}" stroke="${INK}" stroke-width="3.5" stroke-linejoin="round"/>`
     }
   }
-  return `<svg viewBox="-12 -14 124 140" aria-hidden="true"><defs>${defs}</defs>${spikes}
+  // The platform eggs' extras (SHOPS.eggs looks): wings and a planet ring behind / round the egg,
+  // horns, slime drips and leaves, a cloud at the foot.
+  let back = ''
+  let front = ''
+  if (egg.wings)
+    for (const s of [-1, 1])
+      back += `<path transform="translate(50 62) scale(${s} 1)" d="M30 0C46 -22 62 -30 78 -30L70 -18L80 -12L66 -4L74 4L58 6L60 14C46 14 36 10 30 4Z" fill="#f4f8ff" stroke="${INK}" stroke-width="4" stroke-linejoin="round"/>`
+  if (egg.ring) {
+    back += `<ellipse cx="50" cy="72" rx="58" ry="14" fill="none" stroke="#8fd8ff" stroke-width="7" transform="rotate(-12 50 72)"/>`
+    front += `<path d="M-6 84A58 14 0 0 0 106 60" fill="none" stroke="#8fd8ff" stroke-width="7" transform="rotate(-12 50 72)"/>`
+  }
+  if (egg.horns)
+    for (const s of [-1, 1]) back += `<path transform="translate(50 0) scale(${s} 1)" d="M18 22C30 12 36 -2 34 -12C46 0 44 18 26 30Z" fill="#fff1c8" stroke="${INK}" stroke-width="4" stroke-linejoin="round"/>`
+  if (egg.slime) {
+    for (const [x, y, h] of [[18, 92, 16], [36, 104, 20], [62, 106, 14], [82, 94, 18]]) front += `<path d="M${x - 6} ${y}Q${x} ${y + h * 2} ${x + 6} ${y}Z" fill="${egg.color}" stroke="${INK}" stroke-width="3"/>`
+    front += `<ellipse cx="42" cy="6" rx="12" ry="6" fill="#1f9a3a" stroke="${INK}" stroke-width="3" transform="rotate(-25 42 6)"/><ellipse cx="58" cy="6" rx="12" ry="6" fill="#1f9a3a" stroke="${INK}" stroke-width="3" transform="rotate(25 58 6)"/>`
+  }
+  if (egg.cloud) for (const [x, r] of [[12, 13], [30, 15], [50, 16], [70, 15], [88, 13]]) front += `<circle cx="${x}" cy="114" r="${r}" fill="#fff" stroke="${INK}" stroke-width="3.5"/>`
+  return `<svg viewBox="-12 -14 124 140" aria-hidden="true"><defs>${defs}</defs>${back}${spikes}
 <path d="M50 4C77 4 94 50 94 75C94 100 75 116 50 116C25 116 6 100 6 75C6 50 23 4 50 4Z" fill="url(#${id})" stroke="${INK}" stroke-width="4.5"/>
-<ellipse cx="33" cy="38" rx="8" ry="15" fill="#fff" opacity="0.55" transform="rotate(-22 33 38)"/></svg>`
+<ellipse cx="33" cy="38" rx="8" ry="15" fill="#fff" opacity="0.55" transform="rotate(-22 33 38)"/>${front}</svg>`
 }
 
 export function createEggs({ hud, pets, spots }) {

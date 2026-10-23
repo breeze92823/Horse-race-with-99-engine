@@ -10,7 +10,7 @@ import { boosts } from './boosts.js'
 import { buildTrack } from './track.js'
 import { createRaceHud } from './raceHud.js'
 import { createRaceScenery } from './raceScenery.js'
-import { engineBlip, engineRev, sfx } from './audio/index.js'
+import { mountBlip, mountRev, sfx } from './audio/index.js'
 import { setRacing } from './juice.js'
 
 // The race: riding through the START gate hands the horse to this module. It
@@ -30,6 +30,8 @@ const COMPACT_CAM = { ...RACE.camera, ...RACE.camera.compact }
 const ORBIT = RACE.camera.orbit
 
 const CP = RACE.checkpoint
+// Real-world gallop at a top speed of v studs/s, km/h (RACE.kmh).
+const kmhAt = (v) => (RACE.kmh.max * v) / (v + RACE.kmh.half)
 // Checkpoint spacing for a top speed: the step nearest (in log) to CP.seconds of driving.
 const stepFor = (top) => CP.steps.reduce((a, b) => (Math.abs(Math.log(b / (top * CP.seconds))) < Math.abs(Math.log(a / (top * CP.seconds))) ? b : a))
 
@@ -89,7 +91,8 @@ export function createRace({ scene, hud, lobby, world, home, onEnd }) {
   // yaw / pitch: the dragged camera orbit on top of the chase framing (0 = straight behind);
   // in first person the look direction off straight down the lane (+ pitch = looking down).
   // zoom / zoomEased: wheel / pinch metres added to the chase boom; reach: the framing's own boom (m).
-  const s = { racing: false, t: 0, studs: 0, speed: 0, top: 0, x: 0, y: 0, z: 0, scroll: 0, next: 0, earned: 0, camX: 0, sx: 0, sy: 0, boost: null, lastTop: 0, step: 1000, payCap: Infinity, early: CP.early, best: 0, record: false, boostTap: 0, yaw: 0, pitch: 0, zoom: 0, zoomEased: 0, reach: 0 }
+  // mps: this race's metres per stud, so the top speed is a real gallop (RACE.kmh).
+  const s = { racing: false, t: 0, studs: 0, speed: 0, top: 0, mps: 0.1, x: 0, y: 0, z: 0, scroll: 0, next: 0, earned: 0, camX: 0, sx: 0, sy: 0, boost: null, lastTop: 0, step: 1000, payCap: Infinity, early: CP.early, best: 0, record: false, boostTap: 0, yaw: 0, pitch: 0, zoom: 0, zoomEased: 0, reach: 0 }
   // V / CAM / the wheel switch modes mid-race too: first person starts looking down the lane,
   // backing out of it starts the boom a little past its inner end (like camera.js).
   onModeChanged((mode) => {
@@ -125,7 +128,7 @@ export function createRace({ scene, hud, lobby, world, home, onEnd }) {
   function tap(x, y) {
     s.boostTap = Math.min(RACE.tap.max, s.boostTap + RACE.tap.perTap)
     if (x !== undefined) ui.tapAt(x, y)
-    engineBlip()
+    mountBlip()
     sfx.tapKick()
   }
   // Any tap or click that a HUD control did not take (they stop propagation) boosts mid-race.
@@ -150,11 +153,12 @@ export function createRace({ scene, hud, lobby, world, home, onEnd }) {
     inputState.look.dx = inputState.look.dy = inputState.zoom = 0 // a lobby drag / wheel must not swing the race cam
     s.boost = boosts()
     s.top = (RACE.baseSpeed + RACE.speedPerBolt * hud.getStat('wins')) * s.boost.speed
+    s.mps = kmhAt(s.top) / 3.6 / s.top
     s.step = stepFor(s.top)
     s.payCap = s.top * CP.paySeconds
     s.early = CP.early.filter((v) => v < s.step)
     s.record = false
-    if (s.lastTop && s.top > s.lastTop) ui.speedUp(s.lastTop, s.top) // trained since the last race
+    if (s.lastTop && s.top > s.lastTop) ui.speedUp(kmhAt(s.lastTop), kmhAt(s.top)) // trained since the last race
     s.lastTop = s.top
     s.x = s.camX = clamp(player.position.x, -halfLane, halfLane)
     s.y = player.position.y
@@ -167,7 +171,7 @@ export function createRace({ scene, hud, lobby, world, home, onEnd }) {
     ui.setRace(true)
     setRacing(true)
     sfx.raceStart()
-    engineRev()
+    mountRev()
     showNext()
   }
 
@@ -229,7 +233,7 @@ export function createRace({ scene, hud, lobby, world, home, onEnd }) {
       s.studs += speed * dt
 
       // Forward: the horse itself until the cruise point, then the world.
-      const metres = speed * RACE.metresPerStud * dt
+      const metres = speed * s.mps * dt
       s.z -= metres
       let scrolled = 0
       if (s.z < RACE.cruiseZ) {
@@ -267,21 +271,21 @@ export function createRace({ scene, hud, lobby, world, home, onEnd }) {
       // ahead of the horse (hidden past the fog).
       walls.forEach((w, i) => {
         const k = s.next - 1 + i
-        const ahead = k < 0 ? -Infinity : (checkpointAt(k) - s.studs) * RACE.metresPerStud
+        const ahead = k < 0 ? -Infinity : (checkpointAt(k) - s.studs) * s.mps
         w.visible = ahead > -RACE.camera.distance - 4 && ahead < FOG.far
         w.position.set(0, GROUND.level, s.z - ahead)
       })
 
-      ui.setInfo({ ms: s.t * 1000, speed, top: s.top, studs: s.studs, boost: s.boostTap })
+      ui.setInfo({ ms: s.t * 1000, kmh: speed * s.mps * 3.6, top: kmhAt(s.top), studs: s.studs, boost: s.boostTap })
       hud.setDistance(s.studs)
       if (s.studs >= RACE.finish) finish()
       return dt > 0 ? scrolled / dt : 0
     },
-    // Horse speed in m/s (gait, booster flames, hoofbeats).
-    horseSpeed: () => s.speed * (1 + s.boostTap) * RACE.metresPerStud,
-    // Top speed this race in m/s (engine sound).
-    topSpeed: () => s.top * RACE.metresPerStud,
-    // 0..RACE.tap.max: the tap boost right now (engine flames).
+    // Horse speed in m/s (gait, hoofbeats).
+    horseSpeed: () => s.speed * (1 + s.boostTap) * s.mps,
+    // Top speed this race in m/s (sound).
+    topSpeed: () => s.top * s.mps,
+    // 0..RACE.tap.max: the tap boost right now (the horse's tail, the hooves in the mix).
     tapBoost: () => s.boostTap,
     // Chase cam: behind the horse and above it, looking down the track. Dragging
     // (mouse, or the touch look zone) swings it around the horse; the framing
@@ -333,7 +337,7 @@ export function createRace({ scene, hud, lobby, world, home, onEnd }) {
       screenPos.set(s.x, s.y + 1, s.z).project(camera)
       s.sx = ((screenPos.x + 1) / 2) * window.innerWidth
       s.sy = ((1 - screenPos.y) / 2) * window.innerHeight
-      const fov = C.fov + C.speedFov * clamp((s.speed * RACE.metresPerStud) / 50, 0, 1)
+      const fov = C.fov + C.speedFov * clamp((s.speed * s.mps) / 18, 0, 1)
       if (Math.abs(camera.fov - fov) > 0.01) {
         camera.fov = fov
         camera.updateProjectionMatrix()

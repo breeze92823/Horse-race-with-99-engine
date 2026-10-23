@@ -48,7 +48,6 @@ const BODY = `
   <aside class="hs-info">
     <div class="hs-name uiw-text"></div>
     <div class="hs-preview"><img class="hs-preview-pic" alt="" draggable="false"></div>
-    <div class="hs-engines"><span class="hs-rocket">${ICONS.engine}</span><span class="uiw-text" data-hs="engines"></span></div>
     <div class="hs-stats">
       <div class="uiw-text wins" data-hs="wins"></div>
       <div class="uiw-text luck" data-hs="luck"></div>
@@ -124,7 +123,6 @@ export function createHorses({ wallet, onEquip }) {
     info.style.setProperty('--rc', HORSES.rarity[b.rarity])
     info.style.setProperty('--nc', HORSES.nameColor[b.rarity])
     if (preview.dataset.id !== b.id) setPicture(preview, b.id, true)
-    field.engines.textContent = `x${b.engines}`
     field.wins.textContent = `+${short(b.wins)}% Wins`
     field.luck.textContent = `+${short(b.luck)}% Luck`
     field.acc.textContent = `+${short(b.acc)}% Acc`

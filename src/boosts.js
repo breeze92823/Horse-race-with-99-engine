@@ -1,5 +1,4 @@
 import { HORSES, PARTNER, RACE } from './config.js'
-import { ENGINES, engineBoost, engineState } from './engine.js'
 import { partnerBoost, partnerState } from './partner.js'
 import { petBoost, petsState } from './pets.js'
 import { horseState } from './horses.js'
@@ -8,7 +7,6 @@ import { trailById, trailState } from './trails.js'
 
 // Everything the player owns that has a value, wired into gameplay. Each
 // equipped thing is a source of % stats (as its window shows them):
-//   engine   wins / acc / train, times the horse's booster count ("x5" carries 5)
 //   horse    wins / luck / acc
 //   partner  wins / luck / acc
 //   trail    wins / acc
@@ -22,24 +20,16 @@ import { trailById, trailState } from './trails.js'
 //          is each checkpoint's chance to pay double
 // Read when a race starts / a training tick pays, so equipping something counts from the next one.
 const horseById = new Map(HORSES.list.map((h) => [h.id, h]))
-const engineById = new Map(ENGINES.map((e) => [e.id, e]))
 const partnerById = new Map(PARTNER.partners.map((p) => [p.id, p]))
 
 // [{ id, name, wins, acc, luck, train }] in %, one per source (zeros where it has none).
 export function boostSources() {
   const horse = horseById.get(horseState.equipped)
-  const count = horse?.engines ?? 1
-  const engine = engineBoost()
   const partner = partnerBoost()
   const trail = trailById(trailState.equipped)
   const rebirth = rebirthBoost(rebirthState.rebirths)
   const row = (id, name, s = {}) => ({ id, name, wins: s.wins ?? 0, acc: s.acc ?? 0, luck: s.luck ?? 0, train: s.train ?? 0 })
   return [
-    row('engine', `${engineById.get(engineState.equipped)?.name ?? 'No Engine'} x${count}`, {
-      wins: engine.wins * count,
-      acc: engine.acc * count,
-      train: engine.train * count,
-    }),
     row('horse', horse?.name ?? 'No Horse', horse),
     row('partner', partnerById.get(partnerState.equipped)?.name ?? 'No Partner', partner),
     row('trail', trail ? `${trail.name} Trail` : 'No Trail', trail?.stats),

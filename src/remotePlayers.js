@@ -1,19 +1,17 @@
 // The other players in the room, drawn in the world (after Clean-leaves-for-loot's remotePlayers.js):
-// each is their Bloxity avatar riding their equipped horse (boosters in the equipped engine's
-// colours x the horse's booster count), their trail behind it, their pets hovering
+// each is their Bloxity avatar riding their equipped horse, their trail behind it, their pets hovering
 // round it, their partner on its rump and a name tag, eased toward the pose the server last relayed (net.js
 // roster), plus speed x heading for the time since (dead reckoning), so fast racers glide instead
 // of stepping. Poses are in TRACK coordinates (z minus the sender's race scroll): drawn at
 // z + this player's own scroll, racers line up in the lane and lobby players slide away with the
 // start island while this player races. Diffed against the roster every frame, so joins / leaves /
 // gear changes need no events. Nearest first, capped (fewer on touch); pets, partner and trail only
-// up close; a remote horse is `lite` (horse.js): engines baked, no shadows (draw calls).
+// up close; a remote horse is `lite` (horse.js): no hoof dust, no shadows (draw calls).
 import { Group } from 'three'
 import { COARSE_POINTER, HORSES, NET } from './config.js'
 import { roster, net, sameWorld } from './net.js'
 import { createHorse } from './horse.js'
 import { horseLook } from './horseModels.js'
-import { ENGINES } from './engine.js'
 import { trailById } from './trails.js'
 import { createTrail } from './trail.js'
 import { createCompanions } from './companions.js'
@@ -23,7 +21,6 @@ import { applyProportions, attachEquippedAccessories } from './avatar/loader.js'
 import { disposeAnimator, makeAnimator } from './avatar/animator.js'
 
 const angleDelta = (from, to) => Math.atan2(Math.sin(to - from), Math.cos(to - from))
-const engineById = new Map(ENGINES.map((e) => [e.id, e]))
 const horseById = new Map(HORSES.list.map((h) => [h.id, h]))
 const MAX = COARSE_POINTER ? NET.maxRemotesTouch : NET.maxRemotes
 
@@ -99,12 +96,6 @@ class Remote {
     if (p.horse !== a.horse) {
       a.horse = p.horse
       this.horse.setLook(horseLook(horseById.has(p.horse) ? p.horse : HORSES.start.equipped)) // none sent yet: the starter
-      a.engine = undefined // the booster count comes with the horse
-    }
-    if (p.engine !== a.engine) {
-      a.engine = p.engine
-      const count = horseById.get(horseById.has(p.horse) ? p.horse : HORSES.start.equipped)?.engines ?? 1
-      this.horse.setEngines(engineById.get(p.engine)?.look ?? null, count)
     }
     if (p.trail !== a.trail) {
       a.trail = p.trail
@@ -197,7 +188,7 @@ class Remote {
       this.label.material.map?.dispose()
       this.label.material.dispose()
     }
-    this.horse.root.traverse((o) => o.isMesh && o.geometry.dispose()) // body parts + engines: this horse's own
+    this.horse.root.traverse((o) => o.isMesh && o.geometry.dispose()) // body parts: this horse's own
   }
 }
 
@@ -225,7 +216,7 @@ export function createRemotePlayers(scene) {
         })
         st.pets = r.companions.petCount
         st.meshes += st.pets + (r.applied.trailShown ? 1 : 0)
-        return { horse: r.applied.horse, engine: r.applied.engine, ...st }
+        return { horse: r.applied.horse, ...st }
       })
     },
     // viewer: this player's drawn position; scroll: this player's race scroll (m, race.trackScroll)

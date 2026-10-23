@@ -38,30 +38,21 @@ export const NET = {
 
 // --- World (metres: +X east, +Z south, +Y up) -------------------------------
 export const GROUND_Y = 0
-// The start island (world.js): one convex slab, a grass ranch yard with packed-dirt areas. Its
-// front edge sweeps from the start gate (front, -Z) back toward +Z on both wings, so the side
-// barriers funnel toward the gate like the reference shot.
+// The start island (world.js): one convex slab, a sunny plaza of cracked sand. Its front edge
+// sweeps from the start gate (front, -Z) back toward +Z on both wings, so the side fences
+// funnel toward the gate like the reference shot.
 export const YARD = {
   front: -46, // z of the yard's front edge at the start gate
   back: 90, // z of the back edge
   halfWidth: 75, // x extent of the wings
   wingZ: 24, // z of the front edge at the far left/right ends
-  gateEdge: 21.5, // half-width of the straight front edge in front of the gate
+  gateEdge: 52, // half-width of the straight front edge (the arch, the Trails display and portal, the boards)
   depth: 4, // slab thickness
   fenceHeight: 3, // invisible wall around the yard so nobody rides off into the meadow
-  side: '#7a5a3a', // the slab's earth edge
-  grass: '#e8ffd8', // tint on the yard's grass (the meadow's texture, a little fresher)
-  dirtTile: 8, // m per dirt texture tile
-  // Packed-dirt areas, rounded rectangles [x0, z0, x1, z1, corner radius]: the arena from the
-  // spawn to the gate, the stall aprons, the path to the plaza and the training yards.
-  dirt: [
-    [-21, -46, 21, 16, 8],
-    [-34, 0, -16, 24, 4],
-    [16, 0, 34, 24, 4],
-    [-8, 10, 8, 50, 5],
-    [-31, 27, -10, 50, 6],
-    [10, 27, 31, 50, 6],
-  ],
+  side: '#c49a5c', // the slab's sandy edge
+  sandTile: 8, // m per tile of the cracked plaza sand (paintSand: 4x4 slabs, ~2 m each; 3x the slabs per metre, same texture so no extra cost)
+  sandGlow: 0.32, // share of the sand's colour it shows unlit (keeps it sunny yellow under the blue sky fill)
+  dirtTile: 8, // m per dirt texture tile (the Frontier Town's desert)
 }
 // The meadow every world stands in (world.js): grass out to the horizon, under the start island
 // and the race track, scrolled by a race. `tint` multiplies the grass (per world: WORLDS.list.*.ground,
@@ -84,10 +75,14 @@ export const PHYSICS = {
   maxSubSteps: 5, // a long frame never runs more ticks than this
   walkSpeed: 8, // m/s
   sprintSpeed: 14, // m/s with Shift held
-  accel: 70, // m/s^2 toward the target velocity on the ground
+  accel: 30, // m/s^2 a horse gathers speed at from a standstill (player.js tapers it toward the top)
+  accelTaper: 0.5, // share of `accel` left off at sprintSpeed
   airAccel: 22, // m/s^2 steering while airborne
-  decel: 60, // m/s^2 when no key is held
-  turnSpeed: 12, // rad/s the body turns toward its heading
+  decel: 26, // m/s^2 when no key is held (a gallop pulls up in ~4 m)
+  grip: 80, // m/s^2 the hooves kill side-slip at
+  turnSpeed: 8, // rad/s the body turns toward its heading at a standstill
+  turnSpeedFast: 4.5, // rad/s at sprintSpeed (a wider arc at the gallop)
+  turnSlow: 0.2, // share of speed kept while the heading is behind the horse (it arcs round)
   jumpSpeed: 8.5, // m/s
   coyoteTime: 0.1, // s after leaving a ledge a jump still counts
   jumpBuffer: 0.12, // s a jump pressed before landing is remembered
@@ -100,48 +95,98 @@ export const PHYSICS = {
 export const PLAYER_DIMS = { radius: 0.75, height: 1.8 } // wide capsule: it carries the horse
 
 // --- Lobby props (lobby.js) ---------------------------------------------------
-// Roblox-scale, measured off the reference shot: the gate is ~38 m wide and
-// ~50 m ahead of the spawn. Positions are (x, z) in metres.
+// Roblox-scale, laid out off the reference's north view (the spawn looking at the RACE
+// arch, -Z) by back-projecting its pixels: the arch ~50 m ahead, the Trails display and
+// the world portal on the left, three leaderboards and the Christmas tree on the right.
+// Positions are (x, z) in metres; anything facing "the spawn" turns toward SPAWN.
 export const LOBBY = {
-  gate: { z: -43.5, halfWidth: 19, postHeight: 18.5, bannerY: 14.2, bannerHeight: 5.3, padDepth: 4.6, arrowY: 22.5, arrowScale: 3, arrowSpacing: 10.5 },
-  lane: { length: 600 }, // the dirt track and rail fences from the gate posts out into the meadow, into the fog (track.js)
-  // Plank corral walls, each from its gate end to its far end. The left one follows
-  // the yard's front edge; the right one runs straight back past the spawn, like the shot.
-  barrier: {
-    height: 2,
+  // The wooden RACE arch: two square posts, a beam overhanging them, the RACE sign hanging
+  // under it on two hangers, a glowing gold start line between the posts. halfWidth = the
+  // posts' centres (the race lane and its barriers follow it: track.js, race.js).
+  gate: {
+    z: -43.5, halfWidth: 17, post: 2.4, postHeight: 22.6,
+    beamY: 18.9, beamHeight: 3, beamDepth: 2.2, overhang: 3.2,
+    sign: { y: 13.4, width: 23, height: 5.2, hangers: 7.5 },
+    padDepth: 5, // the start line's depth (a glowing strip seen almost edge-on from the spawn)
+  },
+  lane: { length: 600 }, // the road and its barriers from the gate posts out into the meadow, into the fog (track.js)
+  // Wooden post-and-rail ranch fences: polylines from the arch posts out along the yard's front
+  // edges (one collider per segment).
+  fence: {
+    height: 3.2, post: 0.6, spacing: 3.6, rails: [1.35, 2.55], rail: [0.42, 0.3],
     lines: [
-      { from: [-22.5, -43], to: [-62, 8] },
-      // wall: metres of plank wall from the gate end (default the whole line, 0 = none)
-      { from: [23, -43], to: [20, 25], wall: 47, height: 3.2, walkway: true, statues: true },
+      [[-18.3, -43.5], [-50.7, -43.5], [-71.6, 20]],
+      [[18.3, -43.5], [50.7, -43.5], [71.6, 20]],
     ],
   },
-  walkway: { width: 3.2, height: 0.4, check: 3.2 }, // raised plank boardwalk with wooden sides; check = m per plank texture tile
-  statues: { at: [22, 28, 34, 40], scale: 1.05 }, // on the right walkway, m from the wall's gate end
-  upgrade: { x: -20, z: -18, scale: 1.6 },
-  rockets: [
-    // engine: the ENGINE gem engine it sells (interact.js).
-    { name: 'GALACTIC THRUSTER', engine: 'galactic', x: -25, z: -7, label: '#ff4fd8', body: '#f4f6fb', nose: '#e8262b', fin: '#2f7dff', stripe: '#e8262b' },
-    { name: 'BLAZE DRIFT', engine: 'blaze', x: -16, z: -31, label: '#ff3b3b', body: '#1a1b22', nose: '#e8262b', fin: '#e8262b', stripe: '#ffffff' },
+  // L-shaped posts with a lantern hanging off the arm (side = which way the arm reaches).
+  lamps: [
+    { x: -21.2, z: -40.2, side: -1 },
+    { x: 21.2, z: -40.2, side: 1 },
   ],
-  rocketScale: 1.25,
-  pump: { x: -31, z: -20, scale: 1.6 }, // the ranch's wind pump (the Frontier Town's welcome sign)
-  trees: [
-    // x, z, height (the plaza has its own, in PLAZA)
-    [-36, 0, 16],
-    [-46, -6, 12],
-    [25, -6, 15],
-    [36, -14, 12],
-    [52, 6, 11],
-    [-50, 10, 14], // behind the horse stall (west view)
-    [-38, -12, 12], // clear of the wind pump
+  lampHeight: 11,
+  // Left of the arch: the Trails display (a horse galloping in place over a glowing ring
+  // with a lava trail streaming behind it, a low stone wall at its back; its ring is the
+  // Trails hub pad, HUB) and the world portal (worlds.js: the Frontier Town gate, its
+  // requirements written on the glowing fill like the reference's Snow portal).
+  trails: { x: -37.5, z: -22.5, horseScale: 1.7, wall: { z: -27.5, from: -49, to: -34, depth: 2.6 }, trailLength: 17 },
+  portal: { x: -28.8, z: -33.5, width: 5.4, height: 7.4, frame: 1.6, depth: 2 },
+  // Right of the arch: the three leaderboards (PLAZA.leaderboards stats, fed with the plaza's),
+  // each with its top player's Bloxity avatar + pets standing on it (lobby.js); `style` = the frame.
+  boards: [
+    { stat: 'energy', x: 25.4, z: -34, style: 'cyan' },
+    { stat: 'trophies', x: 29, z: -29.5, style: 'gold' },
+    { stat: 'rebirths', x: 33.4, z: -25, style: 'blue' },
+    { stat: 'playtime', x: 38.6, z: -18.5, style: 'green' },
   ],
+  boardScale: 0.92,
+  boardFacing: [2, -14], // the point every board turns its face to
+  boardLean: 0.06, // rad the boards lean back
+  // Christmas dressing (decor.js), all of it off with `festive: false`: string lights and a
+  // wreath on the arch, the tree behind the boards, candy canes, a snowman, presents.
+  festive: true,
+  tree: { x: 52, z: -51, height: 30 },
+  canes: [
+    { x: -58, z: -49, height: 16.5 },
+    { x: -50, z: -50, height: 12.5, turn: 2.6 },
+    { x: 35, z: -48, height: 15 },
+  ],
+  pines: [
+    [-48, -55, 17.5],
+    [-56, -40, 13],
+    [-66, -18, 15],
+    [60, -42, 12],
+  ],
+  snowman: { x: -24.5, z: -38.5 },
+  gifts: [
+    // x, z, size, box, ribbon, yaw
+    [-33.6, -29.5, 2.2, '#2fc2b8', '#ffffff', 0.3],
+    [-31.4, -31.6, 2.8, '#e8262b', '#ffffff', -0.2],
+    [-35.5, -27.8, 1.4, '#e8262b', '#ffd21a', 0.6],
+    [24.2, -22.5, 2.3, '#e8262b', '#ffd21a', 0.4],
+  ],
+  // Market tents beside the road just past the arch: x, z, size, roof stripes.
+  tents: [
+    [-24, -60, 5.5, '#ffd21a', '#2f6bff'],
+    [25, -58, 5.5, '#e8262b', '#ffffff'],
+  ],
+  // The Partner stage, the west view (after the reference): a raised stone stage, its front (+X)
+  // toward the spawn, with a step and four red carpets running up it; the partners stand on it
+  // (`show`, south to north = left to right from the spawn; each one buys / equips that PARTNER,
+  // interact.js), a low stone wall behind them, and the red barn behind that with the "Partner"
+  // sign over it (westScenery.js). x / z = the stage's centre; length runs along z.
+  partner: {
+    x: -35, z: 6, length: 30, depth: 7, height: 1.3, step: 1.8, wall: 1.4, scale: 2,
+    carpets: [-10.5, -3.5, 3.5, 10.5], carpet: 3.8,
+    show: ['anna', 'p456', 'grace', 'younghee', 'diana', 'guard', 'elsa'],
+  },
+  pump: { x: 82, z: -28, scale: 1.6 }, // the ranch's wind pump out by the east barn (the Frontier Town's welcome sign)
+  trees: [], // x, z, height: ranch oaks on the yard (the plaza has its own, in PLAZA)
   colors: {
-    banner: '#0c0d14',
-    bannerFrame: '#3d8bff',
+    wood: '#8a5631', // arch, fences, lamp posts
+    woodDark: '#6b3f22', // the RACE sign
+    woodLight: '#a8703f',
     pad: '#ffd21a',
-    barrier: '#8a5a32', // the plank corral walls' frame
-    walkway: '#c99a62', // the boardwalks' plank tint
-    arrow: '#e81e1e',
   },
 }
 
@@ -149,85 +194,120 @@ export const LOBBY = {
 export const OAK = { trunk: '#7a4f2a', leaves: ['#3f9e32', '#4fb33c', '#5cbf45', '#378a2c'] }
 
 // --- Training plaza at the back of the ranch (plaza.js) ---------------------------
-// The reference's south view: two Train stations either side of a VIP portal
-// under a waterfall, ringed by grassy cliffs. Facing it (+Z), +X is screen-left.
+// The reference's south view: two Train stations (green fields with a white curb on grey
+// pavement) either side of a road to a ring portal in front of a snowy Christmas tree, ringed
+// by grey rock cliffs with pines and far mountains. Facing it (+Z), +X is screen-left.
 export const PLAZA = {
-  platform: { width: 20, depth: 24, height: 0.35 },
+  platform: { width: 20, depth: 24, height: 0.35, curb: 0.55 },
   // Each station: six treadmill lanes in a straight grid of two rows of three
-  // (station frame: rowZ/colX are lane centres), the whole station turned
-  // (yaw) so the lanes' far ends lean toward the VIP in the middle. Lanes are
-  // ~2x the horse's length with 1.8 m aisles between columns and a 2.4 m
-  // walkway between the rows (the front row's SPEED boards stand in it).
-  // `neon` is each lane's glowing rail colour, listed front row first, left to
-  // right as seen from the spawn; `req`/`power` are the lock tags over the
-  // SPEED boards. The front edge stays behind the end of the right walkway
-  // (LOBBY, ~(20, 25)) and the Eggs stall; the back clears the pool and cliffs.
+  // (station frame: rowZ/colX are lane centres), the whole station turned by its
+  // yaw (0: square-on, side by side with a narrow road between them, like the
+  // reference; the portal and decks are behind their back rows). A lane
+  // (the training zone, training.js) is ~2x the horse's length; the treadmill on
+  // it is `mill` (belt between two glowing rails, a console at the far end).
+  // `neon` is each lane's colour, listed front row first, left to right as seen
+  // from the spawn; `req`/`power` are the tags over the consoles. The front edge
+  // stays behind the Eggs stall; the back clears the tree and cliffs.
   lane: { width: 4.2, length: 7.6, rowZ: [-6.5, 4.3], colX: [6.3, 0, -6.3] },
+  mill: { width: 3.3, rail: 0.42, consoleHeight: 2.5 },
+  // Behind each station (where its leaderboards stood): a raised wooden deck reached by steps
+  // from the treadmills, a stone wall at its back, and two catalog horses on glowing pads
+  // (`horses` per train: id, pad colour; buyable with E like the stall's horses).
+  deck: { steps: 4, step: 0.375, tread: 0.55, depth: 4.6, wall: 1.5, horseScale: 2, inset: 3.5 }, // inset: m short of the field's inner edge (the portal stands between the decks)
   trains: [
     {
-      x: 20.5, z: 39, yaw: -0.15, firstSpeed: 1, boards: ['rebirths', 'trophies'],
-      neon: ['#2f8cff', '#33ff6a', '#2f8cff', '#ff3bd8', '#ff2a2a', '#2f8cff'],
+      x: 15, z: 34, yaw: 0,
+      horses: [['rainbowAlicorn', '#ff5fd8'], ['galaxy', '#9a4dff']],
+      neon: ['#eef4ff', '#2bff4a', '#2fb8ff', '#b63bff', '#ff2a2a', '#ff8a1a'],
       req: ['0', '1K', '5K', '35K', '400K', '1M'],
       power: ['+1', '+3', '+5', '+10', '+20', '+30'],
     },
     {
-      x: -20.5, z: 39, yaw: 0.15, firstSpeed: 7, boards: ['energy', 'playtime'],
-      neon: ['#e8f4ff', '#33ff6a', '#27e8ff', '#ff3bd8', '#ff2a2a', '#2f8cff'],
+      x: -15, z: 34, yaw: 0,
+      horses: [['pegasus', '#2fe0ff'], ['skeleton', '#3f7bff']],
+      neon: ['#eef4ff', '#2bff4a', '#2fd8ff', '#ff3bd8', '#ff3b2a', '#ffa21a'],
       req: ['4M', '15M', '50M', '300M', '1.5B', '5B'],
       power: ['+40', '+50', '+60', '+70', '+80', '+90'],
     },
   ],
-  // The two leaderboards behind each station (`boards` above: dark on screen-left, then yellow),
-  // keyed by the saved stat the backend ranks (leaderboard.ts LEADERBOARD_STATS): title over the
-  // board, the stat column's heading and its colour. Rows come from the server's `leaderboard`.
+  // The leaderboards (lobby.js puts them by the RACE arch: LOBBY.boards), keyed by the saved stat
+  // the backend ranks (leaderboard.ts LEADERBOARD_STATS): title over the board, the stat column's
+  // heading and its colour. Rows come from the server's `leaderboard`.
   leaderboards: {
     rebirths: { title: '🔄 Rebirth', column: 'Rebirth', color: '#ff3d8b' },
     trophies: { title: '🏆 Wins', column: 'Wins', color: '#ffe14a' },
     energy: { title: '⚡ Power', column: 'Power', color: '#5fd0ff' },
     playtime: { title: '⏱️ Playtime', column: 'Time', color: '#7dff6a' },
   },
-  vip: { x: 0, z: 42 },
-  portal: { open: '#4fc8ff', locked: '#ff4f6a' }, // the VIP arch's glowing fill (worlds.js)
-  waterfall: { x: 0, z: 53.6, width: 11, height: 32 },
+  // The ring portal on its snow mound (worlds.js; the circle in front of it is WORLDS.portal).
+  vip: { x: 0, z: 52 }, // between the decks, behind the stations' back rows
+  portal: { radius: 3.4, y: 4.6, open: '#3dff6a', locked: '#ff4f6a' }, // the swirl's colour (worlds.js)
+  // Grey pavement under both stations and round the portal, its front edge just in front of
+  // the stations: rounded rectangles [x0, z0, x1, z1, corner radius].
+  pavement: [[-27, 19, 27, 48, 5]],
+  // Behind the portal: the snowy Christmas tree on a patch of snow, candy-striped poles with
+  // lights either side of the portal, candy canes, an autumn pine, the snowman, and snowfall.
+  tree: { x: 4, z: 62.5, height: 28 }, // behind-left of the portal (screen-left = +X)
+  snow: { x: 0, z: 56, rx: 17, rz: 10 },
+  poles: { dx: 6.9, dz: -0.5, height: 11 }, // lights hang between their tops
+  santa: { x: 5.6, z: 47.8 },
+  gifts: [[-5.8, 47.6, 1.5, '#e8262b', '#2bd14a', 0.3], [-7.1, 48.6, 1.1, '#2f6bff', '#ffffff', -0.4], [-4.7, 46.9, 0.9, '#2bd14a', '#e8262b', 0.8]],
+  // A slate stone statue of a rearing horse and rider on a pedestal behind the portal (x, z,
+  // scale: 1 = ~9 m tall).
+  statue: { x: -8.5, z: 60, scale: 1.9 },
+  canes: [
+    { x: -12.2, z: 56.4, height: 11 },
+    { x: -15.2, z: 58.4, height: 14, turn: 2.8 },
+  ],
+  orangePine: [-34, 55, 15],
+  snowman: { x: 32.5, z: 48 },
+  windmill: { x: 41, z: 53, scale: 2.2 },
+  snowfall: { x: 0, z: 39, sx: 40, sz: 26, y: 26, count: 260 },
+  // Far grey mountains past the cliffs (x, z, radius, height), the ranch only.
+  mountains: [[-120, 190, 70, 95], [-20, 230, 90, 120], [90, 200, 75, 100], [180, 150, 60, 80], [-200, 140, 60, 70]],
   // Kiosks just outside the stations' outer edges.
-  golden: { x: 39, z: 37 },
-  index: { x: 36, z: 48 },
-  relics: { x: -39, z: 40 },
-  chest: { x: -36, z: 50 },
-  // x, z, height: red feather flags. They face +-X, so the east view sees them
-  // broadside and the south view edge-on (thin red/white stripes).
-  flags: [[24, 19, 13], [44, 60, 16], [-36, 30, 13], [-50, 64, 16], [36, 31, 13], [33, 54, 13], [-20, 21, 12]],
+  golden: { x: 39, z: 32 },
+  index: { x: 36, z: 43 },
+  relics: { x: -39, z: 35 },
+  chest: { x: -36, z: 45 },
   // x, z, width, depth, height, yaw
   cliffs: [
-    [0, 64, 34, 16, 32, 0],
-    [-30, 72, 32, 18, 27, 0.25],
-    [30, 72, 32, 18, 25, -0.25],
-    [-56, 52, 22, 40, 22, 0.55],
-    [56, 52, 22, 40, 24, -0.55],
-    [-68, 22, 16, 30, 18, 0.2],
-    [68, 22, 16, 30, 16, -0.2],
-    [-15, 56, 12, 8, 13, 0.1],
-    [16, 56, 12, 8, 11, -0.1],
+    [0, 89, 34, 16, 32, 0],
+    [-39.1, 88.7, 32, 18, 27, 0.25],
+    [39.1, 88.7, 32, 18, 25, -0.25],
+    [-67.7, 49.5, 22, 40, 22, 0.55],
+    [67.7, 49.5, 22, 40, 24, -0.55],
+    [-79.6, 13.9, 16, 30, 18, 0.2],
+    [79.6, 13.9, 16, 30, 16, -0.2],
+    [-26.1, 79.3, 12, 8, 13, 0.1],
+    [26.1, 79.3, 12, 8, 11, -0.1],
   ],
-  // x, z, y (cliff top or 0), height
+  // x, z, y (cliff top or 0), height: pines on the ranch (oaks no more), cacti in the Frontier Town
   trees: [
-    [-8, 62, 32, 11],
-    [10, 67, 32, 12],
-    [-24, 67, 27, 12],
-    [-38, 74, 27, 11],
-    [26, 68, 25, 12],
-    [40, 75, 25, 11],
-    [-50, 42, 22, 11],
-    [-58, 60, 22, 10],
-    [50, 40, 24, 12],
-    [60, 62, 24, 10],
-    [-15, 55, 13, 9],
-    [16, 55, 11, 10],
-    [38, 25, 0, 13],
-    [-42, 32, 0, 12],
+    [-8, 87, 32, 11],
+    [10, 92, 32, 12],
+    [-33.1, 83.7, 27, 12],
+    [-47.1, 90.7, 27, 11],
+    [35.1, 84.7, 25, 12],
+    [49.1, 91.7, 25, 11],
+    [-61.7, 39.5, 22, 11],
+    [-69.7, 57.5, 22, 10],
+    [61.7, 37.5, 24, 12],
+    [71.7, 59.5, 24, 10],
+    [-26.1, 78.3, 13, 9],
+    [26.1, 78.3, 11, 10],
+    [-22, 61, 0, 12],
+    [24, 61, 0, 13],
+    [14, 71, 0, 11],
+    [-14, 72, 0, 12],
+    [38, 20, 0, 13],
+    [-42, 27, 0, 12],
   ],
-  rock: '#966a6c',
-  rockDark: '#6c4a52',
+  // The ranch's cliffs: grey rock with grassy tops (buildCliff's palette). Those behind the plaza
+  // (|x| < `hillsWithin`) are drawn as green grassy hills instead, pines on them (environment.js).
+  hillsWithin: 45,
+  rock: '#a4a8b2',
+  rockDark: '#7c818c',
   grass: '#43c03a',
   grassLight: '#7ae04c',
 }
@@ -237,25 +317,32 @@ export const PLAZA = {
 // view, +X) and Horses on the west side (-X). Items are listed left to right as
 // seen from the front.
 export const SHOPS = {
+  // The open egg platform out east, after the reference's east view: a long low concrete
+  // platform (front edge toward the spawn, -X) with a stone wall behind it, the eggs on gift-box
+  // pedestals in a row along it from z0 to z1 (north to south), the "Eggs" sign over the middle.
   eggs: {
-    x: 26,
-    z: 12,
-    yaw: -Math.PI / 2, // local +Z (the front) faces -X
-    width: 19,
-    depth: 7,
+    x: 46, // the pedestals' line
+    z0: -14,
+    z1: 16.4,
+    platform: { front: 41.5, back: 50.5, height: 0.9, overhang: 4 }, // overhang: m past the end eggs
+    wall: { height: 3.6, depth: 1.6 }, // dark stone blocks along the platform's back edge
+    eggScale: 1.55, // the eggs and pedestals are Roblox-big (an egg ~3 m tall)
     // price: Wins (trophies) per hatch; pets: hatch odds by PETS kind (weights, any total).
+    // Look: color, horns, slime (green jelly with drips), rainbow (+ cloud), wings + ring (the
+    // premium angel egg); stand = the pedestal ribbon colour, aura = a stronger glow.
     eggs: [
-      { name: 'Sunny Egg', price: 30, color: '#ffd21a', pets: { dog: 55, cat: 35, bunny: 10 } },
-      { name: 'Spiky Egg', price: 1e3, color: '#ffb21a', spiky: true, pets: { cat: 40, bunny: 35, bear: 20, fox: 5 } },
-      { name: 'Jungle Egg', price: 20e3, color: '#3ddc4a', glow: 0.8, pets: { bunny: 30, bear: 40, fox: 25, panda: 5 } },
-      { name: 'Rainbow Egg', price: 500e3, rainbow: true, pets: { fox: 50, panda: 40, dragon: 10 } },
+      { name: 'Sunny Egg', price: 30, color: '#ffd21a', stand: '#4f8bff', pets: { dog: 55, cat: 35, bunny: 10 } },
+      { name: 'Horned Egg', price: 1e3, color: '#ffa31a', horns: true, stand: '#ff8a1a', pets: { cat: 40, bunny: 35, bear: 20, fox: 5 } },
+      { name: 'Jungle Egg', price: 20e3, color: '#3ddc4a', slime: true, glow: 0.8, stand: '#22c84a', pets: { bunny: 30, bear: 40, fox: 25, panda: 5 } },
+      { name: 'Rainbow Egg', price: 500e3, rainbow: true, cloud: true, stand: '#e8262b', pets: { fox: 50, panda: 40, dragon: 10 } },
+      { name: 'Angel Egg', price: 10e6, color: '#a24bff', wings: true, ring: true, aura: true, glow: 0.9, stand: '#ff3bd8', pets: { panda: 45, dragon: 45, hugeDemon: 10 } },
     ],
   },
   horses: {
-    x: -27,
-    z: 12,
-    yaw: Math.PI / 2, // front faces +X
-    width: 21,
+    x: 42,
+    z: 27,
+    yaw: Math.PI, // front faces -Z (north, toward the egg platform's south end)
+    width: 16,
     depth: 7,
     horseScale: 1.9,
     horseAngle: 0.55, // rad each horse is turned from side-on toward the front
@@ -268,32 +355,79 @@ export const SHOPS = {
   },
 }
 
+// --- The west backdrop (westScenery.js) -----------------------------------------------
+// Behind the Partner stage (LOBBY.partner), after the reference's west view: the big red barn
+// (front = a gable end `width` wide, turned by yaw toward the spawn; white trim, X-braced doors with
+// a wreath, a loft door, a lean-to porch along its south side hung with string lights), the
+// "Partner" sign in front of it, pines, an orange autumn pine, candy canes (LOBBY.festive) and grey
+// low-poly mountains [x, z, radius, height] on the west horizon.
+export const WEST = {
+  barn: { x: -52, z: 7, yaw: Math.PI / 2, width: 21, depth: 20, height: 10.5, roofRise: 8.5, wall: '#d42a2a', roof: '#5d6470', trim: '#f4f6f2' },
+  porch: { width: 5.5, depth: 10, height: 5.5 },
+  pines: [[-45, 28.5, 17], [-51, 31, 14], [-50, -10, 15]],
+  orangePines: [[-55, -14, 13]],
+  canes: [
+    { x: -38.5, z: 24, height: 13 },
+    { x: -41.5, z: 28, height: 16, turn: 2.6 },
+  ],
+  mountains: [[-240, -70, 75, 95], [-270, 40, 95, 125], [-230, 140, 60, 75], [-310, -170, 85, 105]],
+}
+
+// --- The east backdrop (eastScenery.js) -----------------------------------------------
+// Behind the egg platform, after the reference's east view: the farmhouse (front = gable end with
+// the X door, turned by yaw toward the spawn), a block of corn behind the stone wall, a round oak,
+// candy canes (LOBBY.festive), pines, and grey low-poly mountains [x, z, radius, height, seed].
+export const EAST = {
+  barn: { x: 74, z: -15, yaw: -Math.PI / 2, width: 19, depth: 16, height: 11, roofRise: 8, wall: '#a8b8aa', roof: '#6d7d92', trim: '#f4f6f2' },
+  corn: { x0: 53, x1: 60, z0: -12, z1: 12, spacing: 1.1, height: 4.4 },
+  oak: [57, 1, 12],
+  canes: [
+    { x: 56, z: 13, height: 18 },
+    { x: 58.5, z: 18, height: 13, turn: 2.6 },
+  ],
+  pines: [
+    [76, -30, 20],
+    [60, -26, 15],
+    [66, -4, 14],
+  ],
+  mountains: [
+    [190, -70, 70, 80, 1],
+    [235, 10, 95, 110, 2],
+    [200, 95, 70, 75, 3],
+    [260, -150, 90, 95, 4],
+    [165, -15, 42, 48, 5],
+  ],
+  mountainColors: ['#7d848e', '#8e959f', '#a2a9b2', '#b8bec6'],
+}
+
 // --- Hub pads (hub.js) ----------------------------------------------------------------
 // A glowing touch pad in front of each shop object; driving onto one opens its
 // window (once per visit: leave the pad to re-arm it). `open` names the window
 // main.js passes in; keep them on the open yard (the boardwalk runs past the Eggs
-// stall's front, x > 17). Pets = the Eggs stall, Horses = the Horses stall, Engine =
-// the Engine Upgrade machine, Partner = the hero statues on the right boardwalk.
+// stall's front, x > 17). Pets = the Eggs stall, Horses = the Horses stall, Partner = the
+// Partner stage (in front of its middle carpets).
 export const HUB = {
   radius: 2.6, // m: the pad's size and its trigger distance from the horse's centre
   beamHeight: 1.8, // m of glowing light wall round the rim
   labelY: 3.4,
   labelHeight: 1.3,
   pads: [
-    { open: 'pets', name: 'PETS', x: 14.2, z: 12, color: '#ffd21a' },
-    { open: 'horses', name: 'HORSES', x: -19.6, z: 12, color: '#3dff6a' },
-    { open: 'engine', name: 'ENGINES', x: -15.6, z: -12.5, color: '#3ff0ff' },
-    { open: 'partner', name: 'PARTNERS', x: 15.2, z: -12, color: '#ff5fd8' },
+    { open: 'pets', name: 'PETS', x: 37.5, z: 1.2, color: '#ffd21a' },
+    { open: 'horses', name: 'HORSES', x: 37.5, z: 19.5, color: '#3dff6a' },
+    { open: 'partner', name: 'PARTNERS', x: -25.5, z: 6, color: '#ff5fd8' },
+    // plain: just the glowing ring (no light wall or tag): it lies under the Trails display horse,
+    // whose own "Trails" sign floats above it (lobby.js).
+    { open: 'trails', name: 'TRAILS', x: -37.5, z: -22.5, color: '#ff8a1a', plain: true },
   ],
 }
 
 // --- Interact prompts (interact.js) ---------------------------------------------------
 // Near a shop object, a prompt over it says what E (or a tap on the prompt) does:
-// hatch an egg, buy / equip a display horse, rocket engine or statue partner,
-// upgrade to the next ladder engine, or open a hub pad's window. The nearest
+// hatch an egg, buy / equip a display horse or a partner on the Partner stage, or
+// open a hub pad's window. The nearest
 // object in range wins. Radii are m (ground distance) from the object's centre.
 export const INTERACT = {
-  radius: { egg: 9, horse: 8, upgrade: 6.5, rocket: 5, statue: 5 },
+  radius: { egg: 9, horse: 8, statue: 4.5 },
   toastSeconds: 1.8,
 }
 
@@ -318,9 +452,9 @@ export const EGG_HATCH = {
 
 // --- Horses window (horses.js) + catalog looks (horseModels.js) ---------------------
 // The whole horse inventory, in window order (4 per row), in the slots of the boat
-// game's Boats reference: same prices, stats and booster counts. Every horse is
+// game's Boats reference: same prices and stats. Every horse is
 // bought with Wins (the HUD's trophy counter); only the Brown Pony is free (price
-// null). wins / luck / acc are % boosts, engines the rocket xN; `rarity` colours the
+// null). wins / luck / acc are % boosts; `rarity` colours the
 // tile, preview and name. The first two were Robux items in the reference: their
 // Wins price comes from where their stats land on the ladder.
 export const HORSES = {
@@ -330,32 +464,31 @@ export const HORSES = {
   // Horse name colour on the blue card, per rarity.
   nameColor: { premium: '#ff5b37', common: '#e4e4e4', uncommon: '#7dff6a', rare: '#bfeaff', epic: '#ff9ce0', legendary: '#ffd52e' },
   // The 20 horses, in grid order: two premium horses (priced from their stats), then the ladder.
-  // Only the Brown Pony is free. stats are % boosts (wins, luck, acc); engines = rocket boosters
-  // carried (x the equipped engine's boosts, boosts.js). look dresses the model (horseModels.js):
+  // Only the Brown Pony is free. stats are % boosts (wins, luck, acc). look dresses the model (horseModels.js):
   // colours (coat, mane = one or a list per tuft, tail, muzzle, hoof, blaze, sock(s), blanket, trim,
   // saddle) and extras (size, ears, horn, wings, armor, stripes, spots, feathers, maneGlow, eyesGlow,
   // hornGlow, shine = metallic coat).
   list: [
-    { id: 'inferno', name: 'Inferno Nightmare', rarity: 'premium', price: 50e9, wins: 300, luck: 60, acc: 300, engines: 5, look: { coat: '#1b1518', mane: ['#ff3a12', '#ff8a1a', '#ffd23a'], maneGlow: true, eyesGlow: '#ff6a1a', muzzle: '#241c1f', hoof: '#ff5a1a', blaze: false, blanket: '#2a2226', trim: '#ff6a1a', saddle: '#3a2a22' } },
-    { id: 'royalUnicorn', name: 'Royal Unicorn', rarity: 'premium', price: 1e18, wins: 1200, luck: 150, acc: 800, engines: 8, look: { coat: '#f4fbf6', mane: ['#3dff4a', '#a8ffb0'], maneGlow: true, horn: '#3dff4a', hornGlow: true, muzzle: '#e2efe6', hoof: '#c9a43a', blaze: false, blanket: '#0d1f10', trim: '#3dff4a', saddle: '#1d5a26', size: 1.08 } },
-    { id: 'pony', name: 'Brown Pony', rarity: 'common', price: null, wins: 10, luck: 5, acc: 20, engines: 1, look: { size: 0.86 } },
-    { id: 'palomino', name: 'Palomino', rarity: 'common', price: 200, wins: 20, luck: 7, acc: 50, engines: 1, look: { coat: '#e0ab4f', mane: '#fbf0d2', muzzle: '#c78e3a', blanket: '#2f8ad8' } },
-    { id: 'greyMare', name: 'Dapple Grey', rarity: 'common', price: 1e3, wins: 30, luck: 9, acc: 70, engines: 1, look: { coat: '#9da3ab', mane: '#4a4e55', muzzle: '#6e737b', blaze: false, spots: { color: '#c9ced4', where: 'all', count: 22, size: 0.08 }, blanket: '#5a2e8a' } },
-    { id: 'donkey', name: 'Speedy Donkey', rarity: 'common', price: 5e3, wins: 45, luck: 12, acc: 95, engines: 2, look: { coat: '#8a8178', mane: '#3a3532', muzzle: '#e8e2d8', ears: 'long', blaze: false, size: 0.84, blanket: '#c8262b' } },
-    { id: 'mustang', name: 'Wild Mustang', rarity: 'uncommon', price: 40e3, wins: 65, luck: 15, acc: 120, engines: 2, look: { coat: '#c4894a', mane: '#1d1714', muzzle: '#8a5a2e', socks: true, sock: '#2a211c', blaze: false, blanket: '#4c5a2c', trim: '#c9b45a' } },
-    { id: 'blackStallion', name: 'Black Stallion', rarity: 'uncommon', price: 320e3, wins: 90, luck: 19, acc: 150, engines: 2, look: { coat: '#1f1d22', mane: '#0d0c0f', muzzle: '#2c2a30', blaze: '#f2ece0', blanket: '#a8561a', trim: '#f2ece0' } },
-    { id: 'appaloosa', name: 'Appaloosa', rarity: 'uncommon', price: 2.6e6, wins: 120, luck: 24, acc: 185, engines: 3, look: { coat: '#f3eee4', mane: '#4a3424', muzzle: '#8a6a52', blaze: false, spots: { color: '#6b4428', count: 18, size: 0.075 }, blanket: '#13857a' } },
-    { id: 'arabian', name: 'Red Arabian', rarity: 'uncommon', price: 21e6, wins: 150, luck: 29, acc: 220, engines: 3, look: { coat: '#a8411f', mane: '#f0c98a', muzzle: '#7a2e16', socks: true, blanket: '#2a2a33', trim: '#ffcf3a', size: 0.96 } },
-    { id: 'zebra', name: 'Zebra', rarity: 'rare', price: 170e6, wins: 185, luck: 34, acc: 260, engines: 3, look: { coat: '#f6f6f2', mane: ['#16161a', '#f6f6f2'], tail: '#16161a', muzzle: '#2a2a2e', blaze: false, stripes: { color: '#16161a' }, blanket: '#25335a' } },
-    { id: 'clydesdale', name: 'Clydesdale', rarity: 'rare', price: 1.4e9, wins: 225, luck: 40, acc: 300, engines: 4, look: { coat: '#6b3a1e', mane: '#1d140f', muzzle: '#4a2814', socks: true, feathers: true, size: 1.16, blanket: '#b83a2c' } },
-    { id: 'thoroughbred', name: 'Racing Thoroughbred', rarity: 'rare', price: 11e9, wins: 270, luck: 46, acc: 340, engines: 4, look: { coat: '#5a2e18', mane: '#151110', muzzle: '#3d1f10', socks: true, blanket: '#f4f4f4', trim: '#2f9df0', size: 1.04 } },
-    { id: 'knight', name: "Knight's Charger", rarity: 'rare', price: 88e9, wins: 320, luck: 52, acc: 380, engines: 4, look: { coat: '#e9e6e0', mane: '#8a8f98', muzzle: '#bdb8b0', blaze: false, armor: { plate: '#b9c1cc', cloth: '#24427e', trim: '#ffd23a' }, blanket: '#24427e', size: 1.06 } },
-    { id: 'mecha', name: 'Mecha Horse', rarity: 'epic', price: 700e9, wins: 375, luck: 58, acc: 420, engines: 5, look: { coat: '#7c828c', mane: ['#3aa6ff', '#9ae0ff'], maneGlow: true, eyesGlow: '#4ad8ff', muzzle: '#4a4f57', hoof: '#33373d', blaze: false, stripes: { color: '#3ad8ff', kind: 'seams' }, shine: 0.75, blanket: '#3c3f46', trim: '#3ad8ff', saddle: '#2a2c33' } },
-    { id: 'skeleton', name: 'Skeleton Horse', rarity: 'epic', price: 5.6e12, wins: 430, luck: 63, acc: 455, engines: 5, look: { coat: '#ece6d4', mane: '#2a2b30', muzzle: '#d6cfba', hoof: '#2a2b30', blaze: false, eyesGlow: '#7aff4a', stripes: { color: '#3a3b40', kind: 'ribs' }, blanket: '#26272c', trim: '#ffcc22' } },
-    { id: 'pegasus', name: 'Pegasus', rarity: 'epic', price: 45e12, wins: 480, luck: 68, acc: 480, engines: 5, look: { coat: '#f7f8fc', mane: ['#9fd8ff', '#d6eeff'], muzzle: '#e4e7f0', hoof: '#c9a43a', blaze: false, wings: '#ffffff', wingTips: '#cfe9ff', blanket: '#3a6ad8', trim: '#ffd23a' } },
-    { id: 'galaxy', name: 'Galaxy Steed', rarity: 'epic', price: 360e12, wins: 530, luck: 72, acc: 500, engines: 5, look: { coat: '#2a1452', mane: ['#d06bff', '#5ab8ff', '#ff8af3'], maneGlow: true, eyesGlow: '#ffffff', muzzle: '#1d0e3a', hoof: '#d06bff', blaze: false, spots: { color: '#ffffff', where: 'all', count: 26, size: 0.035, glow: true }, blanket: '#17171b', trim: '#d06bff' } },
-    { id: 'golden', name: 'Golden Stallion', rarity: 'legendary', price: 2.9e15, wins: 565, luck: 76, acc: 515, engines: 6, look: { coat: '#f2b818', mane: ['#fff2a8', '#ffd84a'], maneGlow: true, muzzle: '#d99a10', hoof: '#fff2a8', blaze: false, shine: 0.85, blanket: '#1e1f24', trim: '#d8a21a', saddle: '#3a2a1c', size: 1.08 } },
-    { id: 'rainbowAlicorn', name: 'Rainbow Alicorn', rarity: 'legendary', price: 23e15, wins: 600, luck: 80, acc: 530, engines: 6, look: { coat: '#fdf6ff', mane: ['#ff3b3b', '#ff9a1a', '#ffe11a', '#3ddc4a', '#2f9df0', '#a05aff'], maneGlow: true, horn: '#ffe9a8', hornGlow: true, wings: '#ffffff', wingTips: '#ffc8f4', muzzle: '#f0e4f6', hoof: '#c9a43a', blaze: false, blanket: '#2f9df0', trim: '#ffe11a', size: 1.1 } },
+    { id: 'inferno', name: 'Inferno Nightmare', rarity: 'premium', price: 50e9, wins: 300, luck: 60, acc: 300, look: { coat: '#1b1518', mane: ['#ff3a12', '#ff8a1a', '#ffd23a'], maneGlow: true, eyesGlow: '#ff6a1a', muzzle: '#241c1f', hoof: '#ff5a1a', blaze: false, blanket: '#2a2226', trim: '#ff6a1a', saddle: '#3a2a22' } },
+    { id: 'royalUnicorn', name: 'Royal Unicorn', rarity: 'premium', price: 1e18, wins: 1200, luck: 150, acc: 800, look: { coat: '#f4fbf6', mane: ['#3dff4a', '#a8ffb0'], maneGlow: true, horn: '#3dff4a', hornGlow: true, muzzle: '#e2efe6', hoof: '#c9a43a', blaze: false, blanket: '#0d1f10', trim: '#3dff4a', saddle: '#1d5a26', size: 1.08 } },
+    { id: 'pony', name: 'Brown Pony', rarity: 'common', price: null, wins: 10, luck: 5, acc: 20, look: { size: 0.86 } },
+    { id: 'palomino', name: 'Palomino', rarity: 'common', price: 200, wins: 20, luck: 7, acc: 50, look: { coat: '#e0ab4f', mane: '#fbf0d2', muzzle: '#c78e3a', blanket: '#2f8ad8' } },
+    { id: 'greyMare', name: 'Dapple Grey', rarity: 'common', price: 1e3, wins: 30, luck: 9, acc: 70, look: { coat: '#9da3ab', mane: '#4a4e55', muzzle: '#6e737b', blaze: false, spots: { color: '#c9ced4', where: 'all', count: 22, size: 0.08 }, blanket: '#5a2e8a' } },
+    { id: 'donkey', name: 'Speedy Donkey', rarity: 'common', price: 5e3, wins: 45, luck: 12, acc: 95, look: { coat: '#8a8178', mane: '#3a3532', muzzle: '#e8e2d8', ears: 'long', blaze: false, size: 0.84, blanket: '#c8262b' } },
+    { id: 'mustang', name: 'Wild Mustang', rarity: 'uncommon', price: 40e3, wins: 65, luck: 15, acc: 120, look: { coat: '#c4894a', mane: '#1d1714', muzzle: '#8a5a2e', socks: true, sock: '#2a211c', blaze: false, blanket: '#4c5a2c', trim: '#c9b45a' } },
+    { id: 'blackStallion', name: 'Black Stallion', rarity: 'uncommon', price: 320e3, wins: 90, luck: 19, acc: 150, look: { coat: '#1f1d22', mane: '#0d0c0f', muzzle: '#2c2a30', blaze: '#f2ece0', blanket: '#a8561a', trim: '#f2ece0' } },
+    { id: 'appaloosa', name: 'Appaloosa', rarity: 'uncommon', price: 2.6e6, wins: 120, luck: 24, acc: 185, look: { coat: '#f3eee4', mane: '#4a3424', muzzle: '#8a6a52', blaze: false, spots: { color: '#6b4428', count: 18, size: 0.075 }, blanket: '#13857a' } },
+    { id: 'arabian', name: 'Red Arabian', rarity: 'uncommon', price: 21e6, wins: 150, luck: 29, acc: 220, look: { coat: '#a8411f', mane: '#f0c98a', muzzle: '#7a2e16', socks: true, blanket: '#2a2a33', trim: '#ffcf3a', size: 0.96 } },
+    { id: 'zebra', name: 'Zebra', rarity: 'rare', price: 170e6, wins: 185, luck: 34, acc: 260, look: { coat: '#f6f6f2', mane: ['#16161a', '#f6f6f2'], tail: '#16161a', muzzle: '#2a2a2e', blaze: false, stripes: { color: '#16161a' }, blanket: '#25335a' } },
+    { id: 'clydesdale', name: 'Clydesdale', rarity: 'rare', price: 1.4e9, wins: 225, luck: 40, acc: 300, look: { coat: '#6b3a1e', mane: '#1d140f', muzzle: '#4a2814', socks: true, feathers: true, size: 1.16, blanket: '#b83a2c' } },
+    { id: 'thoroughbred', name: 'Racing Thoroughbred', rarity: 'rare', price: 11e9, wins: 270, luck: 46, acc: 340, look: { coat: '#5a2e18', mane: '#151110', muzzle: '#3d1f10', socks: true, blanket: '#f4f4f4', trim: '#2f9df0', size: 1.04 } },
+    { id: 'knight', name: "Knight's Charger", rarity: 'rare', price: 88e9, wins: 320, luck: 52, acc: 380, look: { coat: '#e9e6e0', mane: '#8a8f98', muzzle: '#bdb8b0', blaze: false, armor: { plate: '#b9c1cc', cloth: '#24427e', trim: '#ffd23a' }, blanket: '#24427e', size: 1.06 } },
+    { id: 'mecha', name: 'Mecha Horse', rarity: 'epic', price: 700e9, wins: 375, luck: 58, acc: 420, look: { coat: '#7c828c', mane: ['#3aa6ff', '#9ae0ff'], maneGlow: true, eyesGlow: '#4ad8ff', muzzle: '#4a4f57', hoof: '#33373d', blaze: false, stripes: { color: '#3ad8ff', kind: 'seams' }, shine: 0.75, blanket: '#3c3f46', trim: '#3ad8ff', saddle: '#2a2c33' } },
+    { id: 'skeleton', name: 'Skeleton Horse', rarity: 'epic', price: 5.6e12, wins: 430, luck: 63, acc: 455, look: { coat: '#ece6d4', mane: '#2a2b30', muzzle: '#d6cfba', hoof: '#2a2b30', blaze: false, eyesGlow: '#7aff4a', stripes: { color: '#3a3b40', kind: 'ribs' }, blanket: '#26272c', trim: '#ffcc22' } },
+    { id: 'pegasus', name: 'Pegasus', rarity: 'epic', price: 45e12, wins: 480, luck: 68, acc: 480, look: { coat: '#f7f8fc', mane: ['#9fd8ff', '#d6eeff'], muzzle: '#e4e7f0', hoof: '#c9a43a', blaze: false, wings: '#ffffff', wingTips: '#cfe9ff', blanket: '#3a6ad8', trim: '#ffd23a' } },
+    { id: 'galaxy', name: 'Galaxy Steed', rarity: 'epic', price: 360e12, wins: 530, luck: 72, acc: 500, look: { coat: '#2a1452', mane: ['#d06bff', '#5ab8ff', '#ff8af3'], maneGlow: true, eyesGlow: '#ffffff', muzzle: '#1d0e3a', hoof: '#d06bff', blaze: false, spots: { color: '#ffffff', where: 'all', count: 26, size: 0.035, glow: true }, blanket: '#17171b', trim: '#d06bff' } },
+    { id: 'golden', name: 'Golden Stallion', rarity: 'legendary', price: 2.9e15, wins: 565, luck: 76, acc: 515, look: { coat: '#f2b818', mane: ['#fff2a8', '#ffd84a'], maneGlow: true, muzzle: '#d99a10', hoof: '#fff2a8', blaze: false, shine: 0.85, blanket: '#1e1f24', trim: '#d8a21a', saddle: '#3a2a1c', size: 1.08 } },
+    { id: 'rainbowAlicorn', name: 'Rainbow Alicorn', rarity: 'legendary', price: 23e15, wins: 600, luck: 80, acc: 530, look: { coat: '#fdf6ff', mane: ['#ff3b3b', '#ff9a1a', '#ffe11a', '#3ddc4a', '#2f9df0', '#a05aff'], maneGlow: true, horn: '#ffe9a8', hornGlow: true, wings: '#ffffff', wingTips: '#ffc8f4', muzzle: '#f0e4f6', hoof: '#c9a43a', blaze: false, blanket: '#2f9df0', trim: '#ffe11a', size: 1.1 } },
   ],
   thumb: { width: 256, height: 320, outline: 7, budgetMs: 12 }, // px of each rendered tile picture, ms of drawing per frame (horseThumbs.js)
 }
@@ -370,42 +503,57 @@ export const HORSE = {
   saddle: 1.7, // m the saddle's top above the hooves
   riderY: 1.08, // m the rider's root (its feet at bind pose) above the hooves: seated, hips on the saddle
   riderZ: -0.04, // m the rider sits behind the saddle's centre
+  seatZ: -0.56, // m behind the saddle's centre the partner's seat is (on the back, behind the cantle)
   // Model sizes (m, hooves at y 0, nose +Z): barrel ellipsoid, legs hanging from hipY with the knee
-  // at kneeY, the saddle at saddleZ and the booster rack across the croup at rackY / rackZ.
-  dims: { barrelY: 1.15, barrelLength: 1.9, barrelHeight: 0.86, barrelWidth: 0.78, hipY: 0.98, kneeY: 0.48, frontZ: 0.66, hindZ: -0.64, saddleZ: 0.08, rackY: 1.4, rackZ: -0.5, neckRadius: 0.22, neckLength: 0.42 },
+  // (hock) at kneeY and the fetlock at fetlockY, the saddle at saddleZ.
+  dims: { barrelY: 1.15, barrelLength: 1.9, barrelHeight: 0.86, barrelWidth: 0.78, hipY: 0.98, kneeY: 0.48, fetlockY: 0.2, frontZ: 0.66, hindZ: -0.64, saddleZ: 0.08, neckRadius: 0.22, neckLength: 0.42 },
   // Default colours (a catalog mount overrides some): blaze = the white stripe down the face (false = none).
   look: {
     coat: '#8a5a32', mane: '#2e1d12', hoof: '#2a2420', muzzle: '#6b4428', blaze: '#f2ece0', socks: false, sock: '#f2ece0',
-    blanket: '#d8343a', trim: '#ffd84a', saddle: '#6b3b1d', leather: '#3b2414', metal: '#c9ced6', rack: '#3a3f48',
+    blanket: '#d8343a', trim: '#ffd84a', saddle: '#6b3b1d', leather: '#3b2414', metal: '#c9ced6',
   },
-  engine: '#1d6b55',
-  engineBand: '#8dff6a',
-  flame: '#38d7ff',
-  flameGlow: 3, // HDR multiplier on the engine flames when bloom is on (propkit neon)
   glow: 1.5, // HDR multiplier on a horse's glowing mane / eyes / horn / seams with bloom on
   dust: { color: '#a9845a', opacity: 0.85, from: 2.5, full: 7 }, // hoof dust: fades in between `from` and `full` m/s
-  engineScale: 0.66, // boosters are a bit smaller than the lobby's parked engines
   // Gaits (horse.js): walk -> trot over toTrot m/s, trot -> gallop over toGallop; one cycle per
-  // `stride` m (rate clamped to minRate..maxRate Hz). Per gait: duty = share of the cycle a hoof is
-  // down, swing / flex = rad of leg swing and knee lift, bob = m the body rises per footfall, rock =
-  // rad the gallop rocks the body. *Rest = [upper, lower] rad of a standing leg; jump* = tucked in the air.
+  // `stride` m (rate clamped to minRate..maxRate Hz). The legs are solved (IK) to put each hoof
+  // where its gait says: a hoof is down for `duty` of the cycle, sliding back over `reach` x the
+  // no-slip distance (duty x stride / 2), then swings forward `lift` m up with the hoof flipped
+  // `flip` rad (hind hooves `hindLift` of both). bob = m the body rises per footfall, rock = rad the
+  // gallop rocks it. restZ = m the front / hind hooves stand ahead of their hips; stand = m the body
+  // sits below its build height so the standing legs keep a little bend; jump* = [upper, lower,
+  // pastern] rad tucked in the air.
   gait: {
     idleSpeed: 0.25,
     toTrot: [2.2, 3.6],
     toGallop: [6.5, 9.5],
     minRate: 0.7,
     maxRate: 3,
-    walk: { stride: 1.5, duty: 0.62, swing: 0.32, flex: 0.7, bob: 0.025 },
-    trot: { stride: 2.5, duty: 0.48, swing: 0.45, flex: 1.2, bob: 0.05 },
-    gallop: { stride: 3.8, duty: 0.38, swing: 0.7, flex: 1.6, bob: 0.08, rock: 0.07 },
-    frontRest: [0, 0],
-    hindRest: [0.12, -0.2],
-    hindFlex: 0.6,
-    jumpFront: [-0.9, 1.9],
-    jumpHind: [0.6, 0.2],
+    reach: 0.85,
+    walk: { stride: 1.5, duty: 0.62, lift: 0.11, flip: 0.5, bob: 0.025 },
+    trot: { stride: 2.5, duty: 0.48, lift: 0.22, flip: 1.0, bob: 0.05 },
+    gallop: { stride: 3.8, duty: 0.38, lift: 0.32, flip: 1.6, bob: 0.08, rock: 0.07 },
+    hindLift: 0.7,
+    restZ: [0.03, -0.07],
+    stand: 0.03,
+    jumpFront: [-0.9, 1.9, 0.7],
+    jumpHind: [0.6, 0.2, 0.5],
   },
-  pitchPerAccel: 0.01, // rad of nose-up per m/s^2 of acceleration
-  rollPerTurn: 0.1, // rad of lean into a turn
+  // How the horse carries itself starting, stopping and turning (horse.js).
+  motion: {
+    turnRef: 3.5, // rad/s of turning (measured off the horse's own heading) that is a full bend
+    rollPerTurn: 0.13, // rad of lean into a full-bend turn at speed
+    // Push-off from below `below` m/s at `accel` m/s^2 or more: rump down and nose up (`pitch`,
+    // `drop` m), hind hooves gathered `hindTuck` m under the body, neck stretched out and down.
+    launch: { accel: 12, below: [6, 12], pitch: -0.11, drop: 0.07, hindTuck: 0.3, neck: 0.3, head: -0.18 },
+    // Pulling up at `accel` m/s^2 or more: haunches sit, front legs brace `brace` m ahead, the
+    // strides shorten, head and neck come up, dust sprays forward.
+    halt: { accel: 14, pitch: -0.15, drop: 0.09, brace: 0.3, hindTuck: 0.34, neck: -0.42, head: -0.2 },
+    // [rad/s, damping ratio] of the body's and neck's weight: under-damped, so it rocks and settles.
+    spring: { body: [10, 0.42], neck: [8, 0.38] },
+    settleFrom: 6, // m/s a stop from at least this fast ends in a head toss and shake
+    idleEvery: [2.5, 6], // s between idle fidgets (look round, paw, sniff, shake, rest a hind leg)
+  },
+  pitchPerAccel: 0.006, // rad of nose-up per m/s^2 of acceleration (on top of the launch / halt poses)
   ease: 6, // 1/s the tilt eases
 }
 
@@ -548,7 +696,7 @@ export const GRAPHICS_PRESETS = {
 }
 
 // Bloom (postfx.js): only HDR-bright pixels (above threshold, linear, before
-// tone mapping) glow: neon rails, waterfall, VIP gate, particles. Sunlit sand
+// tone mapping) glow: neon rails, treadmill belts, portal, particles. Sunlit sand
 // stays under the threshold.
 export const BLOOM = { strength: 0.6, radius: 0.35, threshold: 2.0 }
 // Neon materials (propkit.js): k = HDR colour multiplier with bloom on; with
@@ -583,7 +731,7 @@ export const REBIRTH = {
   baseCost: 400, // energy needed for the first rebirth
   costGrowth: 1.75, // each rebirth costs this much more than the one before
   boostPerRebirth: 10, // % boost gained per rebirth (training gains and race Wins, boosts.js)
-  startEnergy: 121, // a new player's lightning (the reference's 121 -> top speed 145)
+  startEnergy: 50, // a new player's lightning
 }
 
 // --- Training (training.js) ------------------------------------------------------------
@@ -637,7 +785,7 @@ export const PETS = {
 // --- Pets + partner in the world (companions.js) ----------------------------------------
 // Equipped pets hover in these slots round the horse (horse frame: +Z = forward, metres; the
 // first ones beside the stern, the rest further back and higher), bobbing `bob` m and swinging
-// after turns (`turnLag` 1/s). The partner stands on the horse's rump behind the rider.
+// after turns (`turnLag` 1/s). The partner rides pillion on the horse's seat behind the rider.
 export const COMPANIONS = {
   slots: [[-2.1, 0.9, -1.4], [2.1, 0.9, -1.4], [0, 1.4, -3.2], [-2.3, 1.4, -3.5], [2.3, 1.4, -3.5], [-1.2, 1.9, -4.8], [1.2, 1.9, -4.8], [0, 2.3, -5.6]],
   petScale: 0.95,
@@ -645,6 +793,35 @@ export const COMPANIONS = {
   bob: 0.14,
   turnLag: 4,
   partnerScale: 0.8,
+  // The partner riding (companions.js createRide). Angles in rad; a limb's z is mirrored per side
+  // (+ = outward for legs, inward for arms when negative). seat = figure units the hip joints sit
+  // above the seat; spring = [rad/s, damping ratio] of its weight sideways, up-down, fore-aft;
+  // maxSway m it may drift, sink / lift m the hips may press into / rise off the seat. pitch, slump,
+  // roll = rad of torso per m of fore-aft drift, of sinking, of sideways drift; swing / dangle =
+  // rad of the lower legs per m of fore-aft drift / of rising; lean (rad, full at leanSpeed m/s)
+  // matches the rider's ANIM.ride; look / peekRoll = rad of a glance round / a lean out past the rider.
+  ride: {
+    seat: 0.12,
+    pose: { spine: 0.14, head: -0.08, thigh: [-1.15, 0, 0.62], shin: [1.25, 0, -0.42], arm: [-1.05, 0, -0.42], fore: [-0.75, 0, 0] },
+    spring: [[8, 0.5], [15, 0.32], [8, 0.42]],
+    accelSmooth: 14,
+    maxAccel: 40,
+    maxSway: 0.25,
+    sink: 0.025,
+    lift: 0.06,
+    pitch: 2.4,
+    slump: 3,
+    roll: 2,
+    swing: 4,
+    dangle: 5,
+    lean: 0.28,
+    leanSpeed: 14,
+    breath: 0.025,
+    breathRate: 0.3,
+    look: 0.8,
+    peekRoll: 0.18,
+    fidgetEvery: [2, 5],
+  },
 }
 
 // --- Online Gifts (gifts.js) -------------------------------------------------------
@@ -850,7 +1027,7 @@ export const HUD = {
   design: { w: 1920, h: 992 },
   minScale: 0.46,
   maxScale: 1.25,
-  stats: { trophies: 433, wins: 121, gems: 0 }, // a new player's values; `wins` (lightning) mirrors the rebirth energy
+  stats: { trophies: 0, wins: 50, gems: 0 }, // a new player's values; `wins` (lightning) mirrors the rebirth energy
   rollMs: 450, // a counter rolls to its new value over this long
   chatUnread: 3,
   dailyGems: 9,
@@ -900,8 +1077,8 @@ export const HUD = {
 // --- Race (race.js) ----------------------------------------------------------------
 // Riding through the START gate starts a race: the horse gallops itself down the
 // buoy lane (A/D or the joystick steer inside it) until `duration` runs out or
-// the player taps Leave. Speeds and distances are in studs; the world moves
-// `metresPerStud` m per stud. Top speed = (baseSpeed + speedPerBolt * lightning)
+// the player taps Leave. Speeds and distances are in studs; the world moves at a real gallop's
+// pace (`kmh`, a per-race metres per stud). Top speed = (baseSpeed + speedPerBolt * lightning)
 // x the Acc speed boost (121 bolts -> 145 before boosts, like the reference). Past `cruiseZ` the horse stays put and the
 // track, meadow and trail scroll instead (the meadow is only GROUND.size wide).
 // --- Race track (track.js) ----------------------------------------------------------------
@@ -909,19 +1086,30 @@ export const HUD = {
 // `margin` m wider than the gate either side, between white rail fences on the gate posts' lines.
 // A race slides the race track by the scroll modulo `tile` (the dirt texture's length, a multiple
 // of postSpacing), so the pattern never jumps.
-export const TRACK = { postSpacing: 4, tile: 8, margin: 1, postSize: [0.22, 1.35, 0.22], rails: [0.62, 1.12], railSize: [0.1, 0.16], wood: '#f6f3ea' }
+// The race road (track.js): asphalt with a dashed white centre line (one dash every `tile` m), and a
+// low red-and-white striped barrier on white legs along each edge.
+export const TRACK = {
+  postSpacing: 4, tile: 8, margin: 1.4, postSize: [0.2, 0.7, 0.2], dash: [0.5, 4],
+  barrier: { y: 1.0, height: 0.85, thick: 0.18, stripe: 2 }, // stripe: m per red + white pair (divides `tile`: the road jumps back a tile at a time while racing)
+  leg: '#f4f4f4', red: '#e8262b', line: '#ffffff',
+}
 
 export const RACE = {
   baseSpeed: 24,
   speedPerBolt: 1,
-  // Acc (engine x horse boosters + horse + partner + trail, boosts.js) also raises top
+  // Acc (horse + partner + trail, boosts.js) also raises top
   // speed: x (1 + accSpeed x acc %). 1 = a "+50% Acc" card is +50% speed; 0 = acceleration only.
   accSpeed: 1,
   // Luck (horse + partner) gives each checkpoint a chance of paying double ("LUCKY x2"):
   // luck / (luck + half), at most `max` (20% luck -> 9%, 200% -> 50%).
   luck: { half: 200, max: 0.75 },
   accelTime: 5, // s from 0 to top speed (shortened by the acc boost, boosts.js)
-  metresPerStud: 0.35,
+  // Real-world speed: a race whose top speed is v studs/s gallops at kmh.max x v / (v + kmh.half)
+  // km/h at the top (a new player's 262 -> 56 km/h, 1K -> 78, 10K -> 89; never past `max`, about
+  // a racehorse's record pace). The horse moves through the world, and the speedometer reads, in
+  // proportion to its studs/s (so the tap boost adds on top, up to ~73 km/h); studs, checkpoints and
+  // Wins still count the race's own studs/s, so training still pays.
+  kmh: { max: 90, half: 160 },
   cruiseZ: -130,
   // The race ends at the finish line (or on Leave): `finish` studs down the lane. A new player
   // tops out at 262 studs/s (145 x the starter gear's +81%), 341 with the tap boost held full,
@@ -990,103 +1178,39 @@ export const RACE = {
   best: { bonus: 0.2 },
 }
 
-// --- Engines (engine.js) ----------------------------------------------------------
-// The Engine window's catalog. Everything but the free Basic Engine is bought with
-// Wins (the HUD's trophy counter). Grid order: the three gem engines (red NEW
-// cards), the Basic Engine, then the 30-engine ladder, one card colour per row of 4.
-// stats are % boosts: wins, acc (horse acceleration), train (training gains).
-// look colours the card art: kind 'rocket' | 'missile' | 'jet' | 'ship' | 'satellite'.
-export const ENGINE = {
-  starter: {
-    id: 'basic',
-    name: 'Basic Engine',
-    stats: { wins: 6, acc: 11, train: 6 },
-    look: { kind: 'rocket', body: '#f4f7f6', band: '#2fd05a', nose: '#f4f7f6', fin: '#e2e8e6', flame: '#3fc8ff' },
-  },
-  // Gem engines cost what a ladder engine with the same Wins boost would cost
-  // (gemPrice in engine.js): Galactic 200M, Blaze 1.9Qa and Cyan Volt, past the
-  // top of the ladder, 36Oc. Set `price` on one to override.
-  gemTier: '#ff5d3a',
-  gems: [
-    { id: 'galactic', name: 'Galactic Thruster', stats: { wins: 55, acc: 105, train: 55 }, look: { kind: 'rocket', body: '#f6f8fb', band: '#ff3b3b', nose: '#ff3b3b', fin: '#2f6bff', flame: '#ff4fd8' } },
-    { id: 'blaze', name: 'Blaze Drift', stats: { wins: 105, acc: 205, train: 105 }, look: { kind: 'jet', body: '#1b1b20', band: '#ff2a2a', nose: '#ff2a2a', fin: '#26262c', flame: '#ffb02e' } },
-    { id: 'cyanvolt', name: 'Cyan Volt', stats: { wins: 200, acc: 355, train: 200 }, look: { kind: 'ship', body: '#eef6ff', band: '#3aa6ff', nose: '#20242c', fin: '#e63a3a', flame: '#5fd8ff' } },
-  ],
-  // Ladder engine k (1..30): price = firstPrice * priceGrowth^(k-1), rounded to 2
-  // significant digits (100, 500, 2.5K, 13K, ... 4.8Sx, 24Sx); wins and train
-  // boosts = winsStep * (k+1) % (10% ... 155%), acc = twice that.
-  ladder: {
-    firstPrice: 100,
-    priceGrowth: 5,
-    winsStep: 5,
-    tiers: ['#c9c9c9', '#69d36b', '#4cb6ff', '#ff6fc8', '#ff4a4a', '#ffc81a', '#a51cff'], // card colour per row of 4 (the last repeats)
-    engines: [
-      { name: 'Red Rocket', look: { body: '#2e2f38', band: '#ff4141', nose: '#f2f2f2', fin: '#8a1d1d' } },
-      { name: 'Blue Rocket', look: { body: '#24304f', band: '#4f7dff', nose: '#c9d6ff', fin: '#1b2850' } },
-      { name: 'Olive Rocket', look: { body: '#5e5a1e', band: '#c9b832', nose: '#d8cc5a', fin: '#403d12' } },
-      { name: 'Violet Rocket', look: { body: '#2c2448', band: '#8a5cff', nose: '#b49aff', fin: '#1d1733' } },
-      { name: 'Navy Booster', look: { body: '#1f2b4d', band: '#3d5aa8', nose: '#2b3c6d', fin: '#141d36' } },
-      { name: 'Camo Booster', look: { body: '#5c5a3c', band: '#8b8a5a', nose: '#3e3d28', fin: '#2f2e1e', camo: true } },
-      { name: 'Crimson Booster', look: { body: '#d9d6d6', band: '#d62b2b', nose: '#b51f1f', fin: '#7d1414' } },
-      { name: 'Jade Booster', look: { body: '#2c3a33', band: '#2fae5d', nose: '#1f7a40', fin: '#1a2620' } },
-      { name: 'Sky Thruster', look: { body: '#e8f6ff', band: '#38b4ff', nose: '#38b4ff', fin: '#1f78c4' } },
-      { name: 'Frost Thruster', look: { body: '#d5f3ff', band: '#8ee7ff', nose: '#ffffff', fin: '#5cb8d8', flame: '#9af0ff' } },
-      { name: 'Tidal Thruster', look: { body: '#0d4f78', band: '#20d1ff', nose: '#0a3350', fin: '#073049', flame: '#20d1ff' } },
-      { name: 'Storm Thruster', look: { body: '#39405a', band: '#ffe03a', nose: '#ffe03a', fin: '#232838', flame: '#ffe96a' } },
-      { name: 'Candy Drive', look: { body: '#ffffff', band: '#ff4fa8', nose: '#ff4fa8', fin: '#c4307a', flame: '#ff8fd0' } },
-      { name: 'Nebula Drive', look: { body: '#3a1d63', band: '#d06bff', nose: '#ff8af3', fin: '#24103f', flame: '#e58aff' } },
-      { name: 'Plasma Drive', look: { body: '#4a1a6e', band: '#ff4fd8', nose: '#ffffff', fin: '#2d0f45', flame: '#ff6af0' } },
-      { name: 'Quasar Drive', look: { body: '#f4ecff', band: '#9b4dff', nose: '#c08bff', fin: '#6a2ad1', flame: '#c9a2ff' } },
-      { name: 'Ember Jet', look: { kind: 'jet', body: '#3a2a26', band: '#ff7a2e', nose: '#ff7a2e', fin: '#5a3a30', flame: '#ffb02e' } },
-      { name: 'Magma Jet', look: { kind: 'jet', body: '#2a1c1c', band: '#ffcf3a', nose: '#ff4a1a', fin: '#7a1f12', flame: '#ff6a2e' } },
-      { name: 'Inferno Jet', look: { kind: 'jet', body: '#d9d6d6', band: '#d62b2b', nose: '#d62b2b', fin: '#9a1a1a', flame: '#ff8a2e' } },
-      { name: 'Volcano Jet', look: { kind: 'jet', body: '#141414', band: '#ff3a1a', nose: '#ffcf3a', fin: '#3a1410', flame: '#ff5a1a' } },
-      { name: 'Sun Missile', look: { kind: 'missile', body: '#6a1e18', band: '#ffcf3a', nose: '#9a2a20', fin: '#3a0f0c' } },
-      { name: 'Bronze Missile', look: { kind: 'missile', body: '#7a4a2a', band: '#c98a4a', nose: '#3a2418', fin: '#4a2a18' } },
-      { name: 'Checker Missile', look: { kind: 'missile', body: '#5a1a1a', band: '#f2f2f2', nose: '#2a2a2a', fin: '#1d1d1d', checker: true } },
-      { name: 'Shadow Missile', look: { kind: 'missile', body: '#1d1d24', band: '#3a3a46', nose: '#2a2a33', fin: '#101015' } },
-      { name: 'Rust Orbiter', look: { kind: 'satellite', body: '#8a3a2a', band: '#c96a4a', nose: '#e8e0d8', fin: '#4a1f18', flame: '#ffb07a' } },
-      { name: 'Night Orbiter', look: { kind: 'satellite', body: '#1d1d24', band: '#3a3a46', nose: '#c9d1d9', fin: '#1f2b6d', flame: '#9ab8ff' } },
-      { name: 'Bee Orbiter', look: { kind: 'satellite', body: '#ffcf1a', band: '#1d1d24', nose: '#e8e8e8', fin: '#2a4fb8', flame: '#ffe96a' } },
-      { name: 'Void Orbiter', look: { kind: 'satellite', body: '#2a1446', band: '#5a2a8a', nose: '#3a2a55', fin: '#2a1a4a', flame: '#c9a2ff' } },
-      { name: 'Horn Satellite', look: { kind: 'satellite', body: '#1d4a4a', band: '#2a2a33', nose: '#1d1d24', fin: '#1f2f6d', flame: '#7affe0' } },
-      { name: 'Wave Point Thruster', look: { kind: 'satellite', body: '#f2f4f8', band: '#ff8fb0', nose: '#f2f4f8', fin: '#2f6bdc', flame: '#ffffff' } },
-    ],
-  },
-}
-
 // --- Partners (partner.js) ----------------------------------------------------------
 // The Partner window's catalog, in grid order (rows of 4). Nothing is free: every
-// partner is bought with Wins (the HUD's trophy counter). The first row are the
-// premium partners (red NEW ribbon), priced by performance against the ladder
-// below them (whose prices grow ~8x per step). stats are % boosts: wins, luck,
+// partner is bought with Wins (the HUD's trophy counter). Theme (after the real
+// game's update): Squid Game players / staff and princesses. The first row are the
+// premium partners (red NEW ribbon), priced above the ladder below them (whose
+// prices grow ~5x per step). stats are % boosts: wins, luck,
 // acc (horse acceleration). tint colours the name in the side panel. look
 // dresses the blocky portrait (partner.js): hair/hat, face, shirt pattern, colours.
 export const PARTNER = {
-  featured: 'hacker', // shown when the window opens
+  featured: 'elsa', // shown when the window opens
   partners: [
-    // Premium row (the reference's Robux 49 / 699 / 1999 / 4999 partners).
-    { id: 'jester', name: 'Jester', price: 85e9, isNew: true, tint: '#ff9ad5', stats: { wins: 120, luck: 80, acc: 115 }, look: { skin: '#fff1ea', hair: 'pigtails', hairColor: '#e9e4dc', tipA: '#ff5fa2', tipB: '#5fb8ff', face: 'clown', shirt: 'stripes', color: '#e8eef5', color2: '#d9263a', pants: '#2b3fa8', pants2: '#d9263a' } },
-    { id: 'batman', name: 'Batman', price: 12e15, isNew: true, tint: '#ffd400', stats: { wins: 340, luck: 230, acc: 330 }, look: { hat: 'cowl', hatColor: '#26262e', shirt: 'emblem', color: '#33343d', color2: '#ffd23a', arms: '#26262e', pants: '#26262e', cape: '#1d1d23' } },
-    { id: 'hacker', name: 'Hacker', price: 800e15, isNew: true, tint: '#f59dff', stats: { wins: 500, luck: 340, acc: 490 }, look: { skin: '#fff1ea', hair: 'pigtails', hairColor: '#f4f1ec', tipA: '#ff4f86', tipB: '#3f8bff', face: 'clown', shirt: 'stripes', color: '#f4f4f4', color2: '#e3263a', pants: '#e3263a', pants2: '#2846c8' } },
-    { id: 'darkknight', name: 'Dark Knight', price: 80e18, isNew: true, tint: '#b9a7ff', stats: { wins: 750, luck: 510, acc: 730 }, look: { hat: 'cowl', hatColor: '#141418', shirt: 'armor', color: '#1d1d23', color2: '#4a4a55', arms: '#141418', pants: '#141418', cape: '#0e0e12' } },
-    // Ladder.
-    { id: 'prisoner', name: 'Prisoner', price: 100, tint: '#ffa31a', stats: { wins: 30, luck: 20, acc: 20 }, look: { hair: 'short', hairColor: '#6b3d1f', shirt: 'jumpsuit', color: '#ff8a1f', color2: '#fff', pants: '#ff8a1f' } },
-    { id: 'police', name: 'Police', price: 2e3, tint: '#7fc4ff', stats: { wins: 35, luck: 25, acc: 25 }, look: { hat: 'police', hatColor: '#1d2c5e', shirt: 'police', color: '#2f63c8', color2: '#ffd23a', pants: '#1d2c5e' } },
-    { id: 'courier', name: 'Courier', price: 80e3, tint: '#ffd400', stats: { wins: 45, luck: 30, acc: 30 }, look: { skin: '#ffd23a', hat: 'cap', hatColor: '#e3263a', shirt: 'bands', color: '#ffd23a', color2: '#1d1d23', arms: '#1d1d23', pants: '#1d1d23' } },
-    { id: 'robber', name: 'Robber', price: 2.4e6, tint: '#d0d0d8', stats: { wins: 55, luck: 35, acc: 35 }, look: { hat: 'balaclava', hatColor: '#1d1d23', shirt: 'hoodie', color: '#2a2a31', color2: '#3d3d46', pants: '#1d1d23', bat: true } },
-    { id: 'builder', name: 'Builder', price: 48e6, tint: '#ffc21a', stats: { wins: 65, luck: 40, acc: 45 }, look: { hat: 'hardhat', hatColor: '#c98a2a', face: 'shades', shirt: 'vest', color: '#2f4f86', color2: '#ff8a1f', pants: '#2b3550' } },
-    { id: 'detective', name: 'Detective', price: 480e6, tint: '#e0b77a', stats: { wins: 75, luck: 50, acc: 55 }, look: { hair: 'swept', hairColor: '#1d1d23', shirt: 'jacket', color: '#b08a4a', color2: '#1d1d23', pants: '#2a2a31' } },
-    { id: 'pinkmask', name: 'Pink Mask', price: 3.8e9, tint: '#ff7ab8', stats: { wins: 90, luck: 60, acc: 70 }, look: { hat: 'mask', hatColor: '#1d1d23', hood: '#e0337a', shirt: 'suit', color: '#e0337a', color2: '#b5205e', pants: '#e0337a' } },
-    { id: 'soldier', name: 'Soldier', price: 30e9, tint: '#c7ccd4', stats: { wins: 110, luck: 70, acc: 85 }, look: { hair: 'short', hairColor: '#2a2a31', shirt: 'camo', color: '#8a8f96', color2: '#5d6168', pants: '#5d6168' } },
-    { id: 'glitch', name: 'Glitch', price: 240e9, tint: '#5dff6a', stats: { wins: 130, luck: 85, acc: 105 }, look: { skin: '#123d18', hat: 'fedora', hatColor: '#0f3313', face: 'code', shirt: 'code', color: '#0f3313', color2: '#3dff5a', arms: '#0f3313', pants: '#0f3313' } },
-    { id: 'superhero', name: 'Superhero', price: 1.9e12, tint: '#6fa8ff', stats: { wins: 160, luck: 105, acc: 130 }, look: { hair: 'swept', hairColor: '#15151a', shirt: 'hero', color: '#2456d6', color2: '#e3263a', pants: '#2456d6', cape: '#e3263a', armsUp: true } },
-    { id: 'mechanic', name: 'Mechanic', price: 15e12, tint: '#ffd400', stats: { wins: 190, luck: 125, acc: 160 }, look: { skin: '#ffd23a', hat: 'cap', hatColor: '#d9263a', shirt: 'bands', color: '#2a2a31', color2: '#ffd23a', arms: '#ffd23a', pants: '#2a2a31' } },
-    { id: 'bandit', name: 'Bandit', price: 120e12, tint: '#d0d0d8', stats: { wins: 230, luck: 150, acc: 195 }, look: { hat: 'balaclava', hatColor: '#141418', shirt: 'hoodie', color: '#1d1d23', color2: '#4a4a55', pants: '#141418', bat: true } },
-    { id: 'foreman', name: 'Foreman', price: 1e15, tint: '#ffc21a', stats: { wins: 270, luck: 180, acc: 240 }, look: { hat: 'hardhat', hatColor: '#ffc21a', face: 'shades', shirt: 'vest', color: '#1f3a6b', color2: '#ffd400', pants: '#1d2c5e' } },
-    { id: 'spy', name: 'Spy', price: 8e15, tint: '#e0b77a', stats: { wins: 330, luck: 220, acc: 300 }, look: { hair: 'swept', hairColor: '#1d1d23', face: 'shades', shirt: 'jacket', color: '#2a2a31', color2: '#d9263a', pants: '#1d1d23' } },
-    { id: 'commander', name: 'Commander', price: 64e15, tint: '#ff7ab8', stats: { wins: 400, luck: 265, acc: 380 }, look: { hat: 'mask', hatColor: '#141418', hood: '#141418', shirt: 'suit', color: '#1d1d23', color2: '#e0337a', pants: '#1d1d23' } },
-    { id: 'guard', name: 'Guard', price: 500e15, tint: '#f2b45a', stats: { wins: 480, luck: 320, acc: 470 }, look: { hair: 'short', hairColor: '#15151a', shirt: 'labcoat', color: '#f2f4f6', color2: '#8fd8d2', arms: '#f2f4f6', pants: '#8fd8d2', clipboard: true } },
+    // Premium row (the reference's Robux princesses Anna / Grace / Diana / Elsa), bought with Wins here.
+    { id: 'anna', name: 'Anna', price: 500e12, isNew: true, tint: '#ff7ac8', stats: { wins: 520, luck: 350, acc: 500 }, look: { face: 'princess', eyes: '#3a7bd5', hair: 'twinbraids', hairColor: '#c8501f', ties: '#2a6ad0', shirt: 'plain', color: '#2a6ad0', color2: '#1d1d23', arms: '#2a6ad0', bodice: '#1d1d23', lace: '#e0408a', skirt: '#2a3a8c', hem: '#e0408a', overskirt: '#2a3a8c', pants: '#2a3a8c', shoes: '#1d1d23', cape: '#c8327a' } },
+    { id: 'grace', name: 'Grace', price: 30e15, isNew: true, tint: '#7dff9a', stats: { wins: 600, luck: 410, acc: 580 }, look: { face: 'princess', eyes: '#3a9a5a', hair: 'long', hairColor: '#f3d98a', crown: '#ffd23a', gem: '#5dff9a', shirt: 'plain', color: '#fff4d6', color2: '#d9b04a', arms: '#fff4d6', gloves: '#fffaf0', bodice: '#f4e3a8', lace: '#d9b04a', neckline: true, sleeves: '#fffaf0', necklace: '#ffd23a', skirt: '#fffaf0', overskirt: '#f4e3a8', hem: '#d9b04a', sparkle: '#ffe680', pants: '#fffaf0' } },
+    { id: 'diana', name: 'Diana', price: 1.5e18, isNew: true, tint: '#ffd23a', stats: { wins: 700, luck: 480, acc: 680 }, look: { face: 'princess', eyes: '#4a6ad0', lips: '#b5205e', hair: 'long', hairColor: '#efe6d6', crown: '#d8dde8', gem: '#7fd0ff', shirt: 'plain', color: '#2a3140', color2: '#8a93a8', arms: '#2a3140', gloves: '#1d2433', bodice: '#1d2433', lace: '#8a93a8', neckline: true, sleeves: '#3a4256', necklace: '#d8dde8', pendant: '#7fd0ff', skirt: '#1d2433', overskirt: '#2a3140', hem: '#c9ced8', sparkle: '#c9ced8', pants: '#1d2433' } },
+    { id: 'elsa', name: 'Elsa', price: 80e18, isNew: true, tint: '#9fe0ff', stats: { wins: 850, luck: 580, acc: 830 }, look: { face: 'princess', eyes: '#3a9ad8', lips: '#e05a8a', hair: 'braid', hairColor: '#f2ecd8', ties: '#9fe0ff', shirt: 'plain', color: '#7fd0ff', color2: '#e8f8ff', arms: '#bfe8ff', bodice: '#5fb8f0', neckline: true, skirt: '#7fd0ff', overskirt: '#bfe8ff', hem: '#e8f8ff', sparkle: '#ffffff', pants: '#7fd0ff', cape: '#bfe8ff', capeAlpha: 0.7 } },
+    // Ladder: Squid Game players and staff mixed with princesses, ~5x per step.
+    { id: 'p456', name: 'Player 456', price: 300, tint: '#4fe0c8', stats: { wins: 30, luck: 20, acc: 20 }, look: { hair: 'short', hairColor: '#15151a', number: '456', shirt: 'jumpsuit', color: '#2a9d9a', color2: '#ffffff', arms: '#2a9d9a', pants: '#2a9d9a', trim: '#ffffff', shoes: '#f4f4f4' } },
+    { id: 'p067', name: 'Player 067', price: 1.5e3, tint: '#4fe0c8', stats: { wins: 35, luck: 25, acc: 25 }, look: { face: 'stern', hair: 'bob', hairColor: '#15151a', number: '067', shirt: 'jumpsuit', color: '#2a9d9a', color2: '#ffffff', arms: '#2a9d9a', pants: '#2a9d9a', trim: '#ffffff', shoes: '#f4f4f4' } },
+    { id: 'younghee', name: 'Young-hee', price: 8e3, tint: '#ffc21a', stats: { wins: 45, luck: 30, acc: 30 }, look: { face: 'doll', eyes: '#1d1a22', hair: 'bob', hairColor: '#15151a', tufts: '#ff9a1a', shirt: 'plain', color: '#ff9a1a', color2: '#ffffff', arms: '#ff9a1a', straps: '#ffc21a', skirt: '#ffc21a', pants: '#f4f4f4', shoes: '#1d1d23' } },
+    { id: 'p199', name: 'Player 199', price: 40e3, tint: '#4fe0c8', stats: { wins: 55, luck: 35, acc: 35 }, look: { skin: '#c98f5f', hair: 'short', hairColor: '#2a1a10', number: '199', shirt: 'jumpsuit', color: '#2a9d9a', color2: '#ffffff', arms: '#2a9d9a', pants: '#2a9d9a', trim: '#ffffff', shoes: '#f4f4f4' } },
+    { id: 'p212', name: 'Player 212', price: 220e3, tint: '#4fe0c8', stats: { wins: 65, luck: 40, acc: 45 }, look: { face: 'smirk', hair: 'bob', hairColor: '#3a2210', number: '212', shirt: 'jumpsuit', color: '#2a9d9a', color2: '#ffffff', arms: '#2a9d9a', pants: '#2a9d9a', trim: '#ffffff', shoes: '#f4f4f4' } },
+    { id: 'snowwhite', name: 'Snow White', price: 1.2e6, tint: '#ff6a6a', stats: { wins: 75, luck: 50, acc: 55 }, look: { face: 'princess', eyes: '#5a3418', lips: '#d9263a', skin: '#fbe3d0', hair: 'bob', hairColor: '#15151a', bow: '#d9263a', shirt: 'plain', color: '#2a5fd0', color2: '#d9263a', arms: '#2a5fd0', bodice: '#2a5fd0', lace: '#d9263a', collar: '#ffffff', sleeves: '#6fa8ff', skirt: '#ffd23a', hem: '#ffffff', pants: '#ffd23a', shoes: '#ffd23a', cape: '#d9263a' } },
+    { id: 'cinderella', name: 'Cinderella', price: 6.5e6, tint: '#9fd8ff', stats: { wins: 90, luck: 60, acc: 70 }, look: { face: 'princess', eyes: '#3a7bd5', hair: 'bun', hairColor: '#f0d27a', band: '#2a6ad0', shirt: 'plain', color: '#bfe8ff', color2: '#ffffff', arms: '#ffffff', gloves: '#ffffff', bodice: '#9fd8ff', neckline: true, sleeves: '#e8f8ff', necklace: '#1d1d23', pendant: '#9fd8ff', skirt: '#9fd8ff', overskirt: '#d8f2ff', hem: '#ffffff', sparkle: '#ffffff', pants: '#9fd8ff' } },
+    { id: 'belle', name: 'Belle', price: 36e6, tint: '#ffd23a', stats: { wins: 110, luck: 70, acc: 85 }, look: { face: 'princess', eyes: '#7a4a1a', hair: 'bun', hairColor: '#5a3418', shirt: 'plain', color: '#ffd23a', color2: '#e0a81a', arms: '#ffd23a', gloves: '#ffd23a', bodice: '#ffc21a', neckline: true, sleeves: '#ffd23a', skirt: '#ffd23a', overskirt: '#ffe27a', hem: '#e0a81a', sparkle: '#fff3b0', pants: '#ffd23a' } },
+    { id: 'ariel', name: 'Ariel', price: 200e6, tint: '#5dffc0', stats: { wins: 130, luck: 85, acc: 105 }, look: { face: 'princess', eyes: '#3ab0d8', hair: 'long', hairColor: '#e0451f', shirt: 'plain', color: '#f1c9a5', color2: '#9a5fd8', arms: '#f1c9a5', shell: '#9a5fd8', skirt: '#2fd0a0', scales: true, pants: '#2fd0a0' } },
+    { id: 'jasmine', name: 'Jasmine', price: 1.1e9, tint: '#4fe0d8', stats: { wins: 160, luck: 105, acc: 130 }, look: { face: 'princess', eyes: '#5a3418', skin: '#d9a066', hair: 'braid', hairColor: '#15151a', ties: '#2fc8c0', band: '#2fc8c0', gem: '#2f63c8', shirt: 'plain', color: '#d9a066', color2: '#2fc8c0', arms: '#d9a066', top: '#2fc8c0', necklace: '#ffd23a', pendant: '#2f63c8', skirt: '#2fc8c0', hem: '#ffd23a', pants: '#2fc8c0', shoes: '#ffd23a' } },
+    { id: 'rapunzel', name: 'Rapunzel', price: 6e9, tint: '#e0a0ff', stats: { wins: 190, luck: 125, acc: 160 }, look: { face: 'princess', eyes: '#3a9a5a', hair: 'long', hairColor: '#f6d24a', flower: '#ff8fd0', shirt: 'plain', color: '#c070e0', color2: '#ffd0f0', arms: '#ffd0f0', bodice: '#a050c8', lace: '#ffd0f0', sleeves: '#ffd0f0', skirt: '#c070e0', hem: '#ffd0f0', pants: '#c070e0' } },
+    { id: 'moana', name: 'Moana', price: 33e9, tint: '#ff8a5a', stats: { wins: 230, luck: 150, acc: 195 }, look: { face: 'princess', eyes: '#3a1a0a', skin: '#c98f5f', hair: 'curly', hairColor: '#2a1a10', flower: '#ff5a5a', shirt: 'plain', color: '#c98f5f', color2: '#e0451f', arms: '#c98f5f', top: '#e8d0a0', necklace: '#2a1a10', pendant: '#2fc8c0', skirt: '#e0451f', overskirt: '#e8d0a0', hem: '#c8a060', pants: '#e0451f' } },
+    { id: 'recruiter', name: 'Recruiter', price: 400e9, tint: '#d0d0d8', stats: { wins: 270, luck: 180, acc: 240 }, look: { face: 'smirk', hair: 'swept', hairColor: '#15151a', shirt: 'suit', color: '#23232b', color2: '#2a2a33', arms: '#23232b', tie: '#1d1d23', pants: '#23232b', shoes: '#0e0e12', ddakji: true } },
+    { id: 'guard', name: 'Guard', price: 2e12, tint: '#ff5fb0', stats: { wins: 330, luck: 220, acc: 300 }, look: { hat: 'mask', hatColor: '#141418', hood: '#e0337a', symbol: 'circle', shirt: 'suit', color: '#e0337a', color2: '#b5205e', pants: '#e0337a', belt: '#15151a', gloves: '#15151a', shoes: '#15151a' } },
+    { id: 'frontman', name: 'Front Man', price: 12e12, tint: '#a0a0b0', stats: { wins: 400, luck: 265, acc: 380 }, look: { hat: 'mask', hatColor: '#15151a', hood: '#15151a', symbol: 'facets', shirt: 'suit', color: '#15151a', color2: '#2a2a33', arms: '#15151a', pants: '#15151a', belt: '#2a2a33', gloves: '#0e0e12', shoes: '#0e0e12', cape: '#0e0e12' } },
+    { id: 'vip', name: 'VIP', price: 70e12, tint: '#ffd23a', stats: { wins: 480, luck: 320, acc: 470 }, look: { hat: 'mask', hatColor: '#d9a82a', hood: '#d9a82a', symbol: 'lion', mane: '#c88a1a', shirt: 'suit', color: '#3a1a3a', color2: '#d9a82a', arms: '#3a1a3a', gloves: '#d9a82a', necklace: '#ffd23a', pendant: '#d9263a', sash: '#d9a82a', pants: '#2a1a2a', shoes: '#1d1d23', cape: '#8a1f2a' } },
   ],
 }
 
@@ -1145,7 +1269,7 @@ export const TRAILS = {
   // view = horizontal direction the camera looks; the horse faces the camera's right. horseWidth =
   // share of the screen width the horse's length fills (portrait*: on tall screens); lookAt = the
   // camera aims this share of the saddle height up.
-  showcase: { x: 57, z: -18.5, y: GROUND.level, view: [-0.795, 0.607], speed: 24, distance: 5.2, height: 0.55, lookAt: 0.55, horseWidth: 0.34, portraitHorseWidth: 0.6, portraitRaise: 0.3 },
+  showcase: { x: 53, z: -18.5, y: GROUND.level, view: [-0.795, 0.607], speed: 24, distance: 5.2, height: 0.55, lookAt: 0.55, horseWidth: 0.34, portraitHorseWidth: 0.6, portraitRaise: 0.3 },
 }
 
 // --- Audio (src/audio/) ---------------------------------------------------------------
@@ -1154,8 +1278,8 @@ export const TRAILS = {
 export const AUDIO = {
   volume: 0.8,
   storageKey: 'horse-race-99.sound',
-  buses: { ui: 0.8, sfx: 0.9, amb: 0.55, engine: 0.5 }, // per-bus levels before the master
-  duck: 0.45, // world (ambience + engine) level while a menu window is open
+  buses: { ui: 0.8, sfx: 0.9, amb: 0.55, mount: 0.5 }, // per-bus levels before the master
+  duck: 0.45, // world (ambience + the horse) level while a menu window is open
   maxVoices: 48, // one-shot sounds at once before low-priority ones are skipped
   maxVoicesTouch: 24,
   // Output buffer (s, the AudioContext latencyHint): 'interactive' (~10 ms) crackles and drops out
@@ -1167,15 +1291,14 @@ export const AUDIO = {
   // Generated impulse response: pre-delay s, early reflections [ms, gain], tail decay s (to -60 dB),
   // tail level, how fast the tail darkens, and the default send level.
   reverb: { seconds: 1.8, preDelay: 0.012, early: [[19, 0.5], [31, 0.35], [47, 0.28], [73, 0.2], [97, 0.12]], decay: 1.4, tail: 0.18, darken: 1.6, send: 0.9 },
-  // The horse (audio/mount.js): booster roar / rumble levels; hooves = the hoofbeats' and breaths'
-  // level, thud / clop / crunch / breath / snort = their parts; snortEvery = s between snorts standing
-  // still; idleLevel = the boosters' mix level standing still in the lobby, settle = racing level
-  // once the speed is steady, eased to over settleTime s.
-  mount: { roar: 0.2, rumble: 0.1, hooves: 0.9, thud: 0.3, clop: 0.22, crunch: 0.12, breath: 0.32, snort: 0.9, snortEvery: [7, 16], idleLevel: 0.3, settle: 0.62, settleTime: 4 },
+  // The horse (audio/mount.js): hooves = the hoofbeats' and breaths' level, thud / clop / crunch /
+  // breath / snort = their parts; snortEvery = s between snorts standing still; settle = their
+  // racing level once the speed is steady (taps, boosts and the start bring them back up).
+  mount: { hooves: 0.9, thud: 0.3, clop: 0.22, crunch: 0.12, breath: 0.32, snort: 0.9, snortEvery: [7, 16], settle: 0.62 },
   // The countryside (audio/ambience.js): scheduler tick s; wind level and how much a race's rush of
   // air adds; grass rustle in the gusts; bird level and the gap range s (fewer while racing); crowd
   // level (racing), its lobby share and the gap range s between cheers while racing; crickets [Hz,
-  // pan] and their level; waterfall level and the distance (m) at which it is at half level.
+  // pan] and their level.
   ambience: {
     tick: 0.25,
     wind: 0.035,
@@ -1189,8 +1312,6 @@ export const AUDIO = {
     cheerEvery: [12, 28],
     cricket: 0.025,
     crickets: [[4400, -0.6], [4750, 0.5], [5100, 0.1]],
-    waterfall: 0.55,
-    waterfallNear: 16,
   },
 }
 

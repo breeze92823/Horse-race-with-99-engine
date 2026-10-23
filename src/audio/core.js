@@ -6,7 +6,7 @@
 //         sfx ──┬──────────────────────────┤
 //               └─ reverb send ─ convolver ┤
 //         world (duck) ─┬─ amb ────────────┼─ master ─ glue comp ─ limiter ─ out
-//                       └─ engine ─────────┘
+//                       └─ mount ──────────┘
 // `world` dips while a menu window is open so the UI sits on top of the scene.
 // The reverb is a generated impulse response: a few early reflections (the
 // cliffs and stalls) and a short, darkening tail, so one-shots sit in the ranch
@@ -21,7 +21,7 @@ export const A = {
   verb: null, // reverb send input
   world: null,
   amb: null,
-  engine: null,
+  mount: null, // the player's horse: hooves, breath
   noise: {}, // white / pink / brown mono buffers, pinkStereo for beds
   voices: 0, // one-shot voices sounding now (see voice())
 }
@@ -177,7 +177,7 @@ function buildGraph() {
   A.sfx = bus(AUDIO.buses.sfx)
   A.world = bus(ducked ? AUDIO.duck : 1)
   A.amb = bus(AUDIO.buses.amb, A.world)
-  A.engine = bus(AUDIO.buses.engine, A.world)
+  A.mount = bus(AUDIO.buses.mount, A.world)
   const conv = ctx.createConvolver()
   conv.buffer = makeImpulse(ctx)
   A.verb = ctx.createGain()
@@ -224,7 +224,7 @@ export const ready = () => !!A.master && A.ctx.state === 'running'
 // thread before their envelope begins even if the main thread stalls right after.
 export const now = () => A.ctx.currentTime + AUDIO.lead
 
-// Menu window open: the world (ambience + engine) steps back.
+// Menu window open: the world (ambience + the horse) steps back.
 export function setDucked(on) {
   if (on === ducked) return
   ducked = on

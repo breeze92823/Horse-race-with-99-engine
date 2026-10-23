@@ -9,7 +9,7 @@ import { sfx } from './audio/index.js'
 // Hub pads: a glowing touch pad in front of each shop object (HUB.pads). The
 // horse riding onto one opens that object's window: the Eggs stall opens Pets,
 // the Horses stall Horses, the Engine Upgrade machine Engine, the hero statues
-// Partner. A pad fires once per visit (drive off to re-arm), and never while
+// Partner, the Trails display the Trails scene. A pad fires once per visit (drive off to re-arm), and never while
 // another window is open (it just counts as visited then), so closing a window
 // on the pad does not pop it straight back up.
 // windows: { [pad.open]: () => void }.
@@ -37,14 +37,17 @@ export function createHub(scene, windows) {
     inner.rotation.x = Math.PI / 2
     inner.position.y = 0.1
     g.add(inner)
-    // A short see-through light wall round the rim, so the flat pad reads from the low chase cam.
+    // A short see-through light wall round the rim, so the flat pad reads from the low chase cam,
+    // and its name floating over it (a `plain` pad is just the glowing ring).
     const fade = new CanvasTexture(paintFade(spec.color))
     fade.colorSpace = SRGBColorSpace
     const beamMat = new MeshBasicMaterial({ map: fade, transparent: true, opacity: 0.5, blending: AdditiveBlending, depthWrite: false, side: DoubleSide, fog: false })
-    put(g, beam, beamMat, 0, HUB.beamHeight / 2, 0, false)
     const tag = label(spec.name, HUB.labelHeight, { color: spec.color, outline: '#1a0a14', font: '700 64px Fredoka, sans-serif', outlineWidth: 10 })
     tag.position.y = HUB.labelY
-    g.add(tag)
+    if (!spec.plain) {
+      put(g, beam, beamMat, 0, HUB.beamHeight / 2, 0, false)
+      g.add(tag)
+    }
     sparkles.push({ x: spec.x, y: 0.6, z: spec.z, sx: R * 0.8, sy: 0.3, sz: R * 0.8, color: spec.color })
     return { spec, glowMat, beamMat, inner, tag, phase: i * 1.7, inside: false }
   })

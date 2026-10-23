@@ -7,16 +7,15 @@ import {
   MeshStandardMaterial,
   PlaneGeometry,
   Shape,
-  ShapeGeometry,
   SphereGeometry,
 } from 'three'
 import { GROUND, HILL, TOWN, YARD } from './config.js'
 import { RAPIER, addFixed } from './physics.js'
-import { mulberry32, paintDirt, paintGrass, toTexture } from './textures.js'
+import { mulberry32, paintDirt, paintGrass, paintSand, toTexture } from './textures.js'
 import { buildOak } from './propkit.js'
 import { bake } from './bake.js'
 
-// The lobby ground: the ranch's grass yard with packed-dirt areas, a slab just
+// The lobby ground: the ranch's plaza of cracked sand, a slab just
 // proud of a grass meadow that runs to the horizon (the race track crosses it),
 // with green hills on the far left horizon, a wooded hill to the east, and
 // puffy clouds in the sky. The meadow and clouds are shared by every world
@@ -26,8 +25,8 @@ import { bake } from './bake.js'
 // every edge (landColliders, the same in every world).
 //
 // Texture techniques used here:
-//  - yard: the grass painter (colour + bump) and the dirt painter, world-space
-//    UVs (ExtrudeGeometry caps and ShapeGeometry use shape coordinates = metres)
+//  - yard: the cracked sand painter, world-space UVs (ExtrudeGeometry caps use
+//    shape coordinates = metres)
 //  - meadow: the grass painter's colour + bump, its v offset scrolled by a race
 
 // The start island's outline in world (x, z), counter-clockwise seen from above. Convex.
@@ -127,41 +126,14 @@ export function buildSlab(root, top, side) {
   root.add(slab)
 }
 
-// A rounded rectangle [x0, z0, x1, z1, r] as a Shape in outlineShape's (x, -z) space.
-function roundedRect([x0, z0, x1, z1, r]) {
-  const s = new Shape()
-  const [a, b, c, d] = [x0, -z1, x1, -z0] // shape-space min x, min y, max x, max y
-  s.moveTo(a + r, b)
-  s.lineTo(c - r, b)
-  s.quadraticCurveTo(c, b, c, b + r)
-  s.lineTo(c, d - r)
-  s.quadraticCurveTo(c, d, c - r, d)
-  s.lineTo(a + r, d)
-  s.quadraticCurveTo(a, d, a, d - r)
-  s.lineTo(a, b + r)
-  s.quadraticCurveTo(a, b, a + r, b)
-  return s
-}
-
-// The ranch's land: a grass yard with packed-dirt areas (one mesh: overlapping patches share
-// world-space UVs, so they join seamlessly), green hills on the far left horizon and the wooded
-// hill to the east.
+// The ranch's land: a sunny plaza of cracked sand (world-space UVs), green hills on the far left
+// horizon and the wooded hill to the east.
 export function buildRanchLand(root) {
-  const grass = paintGrass()
-  const top = new MeshStandardMaterial({
-    color: YARD.grass,
-    map: toTexture(grass.color, { repeat: 1 / GROUND.tile, srgb: true }),
-    bumpMap: toTexture(grass.height, { repeat: 1 / GROUND.tile }),
-    bumpScale: 0.6,
-    roughness: 1,
-  })
+  // A little of the sand lit by itself: the reference's plaza is a saturated sunny yellow that the
+  // sky's blue fill would otherwise grey down.
+  const sand = toTexture(paintSand(), { repeat: 1 / YARD.sandTile, srgb: true })
+  const top = new MeshStandardMaterial({ map: sand, emissiveMap: sand, emissive: '#ffffff', emissiveIntensity: YARD.sandGlow, roughness: 1 })
   buildSlab(root, top, YARD.side)
-  const dirtGeo = new ShapeGeometry(YARD.dirt.map(roundedRect), 6)
-  dirtGeo.rotateX(-Math.PI / 2)
-  const dirt = new Mesh(dirtGeo, new MeshStandardMaterial({ map: toTexture(paintDirt(), { repeat: 1 / YARD.dirtTile, srgb: true }), roughness: 1 }))
-  dirt.position.y = 0.02
-  dirt.receiveShadow = true
-  root.add(dirt)
 
   // Far scenery: green hills on the left horizon, a hazy mountain behind them.
   root.add(

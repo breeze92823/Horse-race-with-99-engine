@@ -112,27 +112,6 @@
   height: 0;
 }
 
-/* --- Timer ------------------------------------------------------------------------------- */
-.hud-timer {
-  --w: calc(466 * var(--u));
-  position: absolute;
-  left: 50%;
-  top: calc(17 * var(--u));
-  width: var(--w);
-  height: calc(65 * var(--u));
-  margin-left: calc(var(--w) / -2);
-  container-type: inline-size;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(64, 112, 168, 0.5);
-}
-.timer-text {
-  font-size: 12.5cqw;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.01em;
-}
-
 /* --- Podium: 1st / 2nd / 3rd medals hanging under the timer ------------------------------- */
 .hud-podium {
   --m: calc(92 * var(--u));
@@ -262,14 +241,16 @@
   box-shadow: 0 0 0 max(1px, calc(2 * var(--u))) rgba(0, 0, 0, 0.35);
 }
 
-/* --- Left: CLAIM + menu tiles ------------------------------------------------------------------------- */
+/* --- Left: stat pills + menu tiles (under Boxity's toolbar, setReserved) ------------------------------- */
 .hud-left {
-  --tile: max(var(--tap), calc(88 * var(--u)));
+  --tile: max(var(--tap), calc(86 * var(--u)));
   position: absolute;
   left: calc(var(--sl) + 10 * var(--u));
-  top: calc(var(--st) + 240 * var(--u));
+  top: calc(var(--st) + 175 * var(--u));
 }
 .hud-claim {
+  flex: none;
+  align-self: flex-end;
   width: calc(212 * var(--u));
   height: calc(72 * var(--u));
   min-height: var(--tap);
@@ -317,8 +298,8 @@
 .hud-grid {
   display: grid;
   grid-template-columns: var(--tile) var(--tile);
-  gap: calc(16 * var(--u)) calc(20 * var(--u));
-  margin: calc(18 * var(--u)) 0 0 calc(15 * var(--u));
+  gap: calc(24 * var(--u)) calc(18 * var(--u));
+  margin: calc(28 * var(--u)) 0 0 calc(12 * var(--u));
 }
 .hud-tile {
   width: var(--tile);
@@ -340,20 +321,10 @@
   height: 100%;
   object-fit: contain;
 }
+/* Icon-only tiles (the name is the button's title / aria-label). */
 .tile-icon {
   position: absolute;
-  left: 8%;
-  right: 8%;
-  top: 3%;
-  height: 68%;
-}
-.tile-label {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 4%;
-  text-align: center;
-  font-size: calc(var(--tile) * 0.28);
+  inset: 9%;
 }
 .tile-alert {
   position: absolute;
@@ -370,14 +341,14 @@
   font-size: calc(var(--tile) * 0.26);
 }
 
-/* --- Right: promos, stats, autos, boosts ------------------------------------------------------------- */
+/* --- Right: CLAIM, autos (boosts on touch) ------------------------------------------------------------ */
 .hud-right {
   position: absolute;
-  right: calc(var(--sr) + 30 * var(--u));
-  top: calc(var(--st) + 228 * var(--u));
+  right: calc(var(--sr) + 17 * var(--u));
+  top: calc(var(--st) + 455 * var(--u));
   display: flex;
   flex-direction: column;
-  gap: calc(13 * var(--u));
+  gap: calc(15 * var(--u));
 }
 .right-a,
 .right-b {
@@ -385,7 +356,7 @@
   width: var(--rw);
   display: flex;
   flex-direction: column;
-  gap: calc(13 * var(--u));
+  gap: calc(15 * var(--u));
 }
 .hud-promos {
   display: flex;
@@ -447,24 +418,29 @@
   height: calc(22 * var(--u));
 }
 
+/* Counter pills: the icon overhangs the left end, the number is centred in the rest. */
 .hud-stats {
   display: flex;
   flex-direction: column;
-  gap: calc(13 * var(--u));
+  gap: calc(20 * var(--u));
 }
 .hud-stat {
   position: relative;
-  height: calc(45 * var(--u));
+  width: calc(226 * var(--u));
+  height: calc(52 * var(--u));
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  padding-right: calc(54 * var(--u));
-  border-radius: calc(22 * var(--u));
+  justify-content: center;
+  padding: 0 calc(12 * var(--u)) 0 calc(62 * var(--u));
+  border: max(1.5px, calc(3 * var(--u))) solid var(--ink);
+  border-radius: calc(26 * var(--u));
   background: linear-gradient(#ffffff, #e2e5ea);
-  box-shadow: 0 calc(2 * var(--u)) calc(4 * var(--u)) rgba(0, 0, 0, 0.18);
+  box-shadow:
+    inset 0 calc(-5 * var(--u)) 0 rgba(0, 0, 0, 0.1),
+    0 calc(2 * var(--u)) calc(4 * var(--u)) rgba(0, 0, 0, 0.18);
 }
 .stat-num {
-  font-size: calc(34 * var(--u));
+  font-size: calc(36 * var(--u));
 }
 .stat-trophies .stat-num {
   --fill: linear-gradient(#fff07a 15%, #ff9a00 85%);
@@ -477,25 +453,24 @@
 }
 .stat-icon {
   position: absolute;
-  right: calc(-8 * var(--u));
+  left: calc(-8 * var(--u));
   top: 50%;
-  width: calc(58 * var(--u));
-  height: calc(58 * var(--u));
+  width: calc(68 * var(--u));
+  height: calc(68 * var(--u));
   transform: translateY(-50%);
 }
 
 .hud-autos {
   display: flex;
   flex-direction: column;
-  gap: calc(14 * var(--u));
-  margin-top: calc(1 * var(--u));
+  gap: calc(28 * var(--u));
 }
 .hud-auto {
-  height: max(var(--tap), calc(57 * var(--u)));
+  height: max(var(--tap), calc(63 * var(--u)));
   display: flex;
   align-items: center;
   gap: calc(6 * var(--u));
-  padding-left: calc(10 * var(--u));
+  padding: 0 calc(6 * var(--u)) 0 calc(10 * var(--u));
   border: max(2px, calc(4 * var(--u))) solid #ff9e9e;
   border-radius: calc(10 * var(--u));
   background: linear-gradient(#ff5e5e, #e0252b);
@@ -508,17 +483,28 @@
 }
 .auto-icon {
   flex: none;
-  width: calc(42 * var(--u));
-  height: calc(42 * var(--u));
+  width: calc(50 * var(--u));
+  height: calc(50 * var(--u));
 }
 .auto-label {
-  font-size: calc(27 * var(--u));
+  font-size: calc(24 * var(--u));
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 .hud-boosts {
   display: flex;
   gap: calc(8 * var(--u));
   margin: calc(3 * var(--u)) 0 0 calc(7 * var(--u));
+}
+/* Off touch the boosts sit over the bars' left end (hud.js placeBoosts). */
+.hud-bars > .hud-boosts {
+  position: absolute;
+  left: calc(14 * var(--u));
+  bottom: calc(100% + 10 * var(--u));
+  margin: 0;
+  pointer-events: auto;
 }
 .hud-boost {
   --c: #ffc21a;
@@ -563,7 +549,7 @@
   left: 0;
   right: 0;
   bottom: calc(var(--sb) + 10 * var(--u) + var(--lift));
-  width: min(calc(1044 * var(--u)), calc(100% - 2 * var(--side) - var(--sl) - var(--sr) - 24px - 30 * var(--u)));
+  width: min(calc(1346 * var(--u)), calc(100% - 2 * var(--side) - var(--sl) - var(--sr) - 24px - 30 * var(--u)));
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -711,7 +697,7 @@
    (bottom-right, sizes copied from touch.css) clear.
    ============================================================================================ */
 .hud {
-  --rw: max(calc(210 * var(--u)), calc(3 * var(--tap) + 30 * var(--u))); /* right column */
+  --rw: max(calc(234 * var(--u)), calc(3 * var(--tap) + 30 * var(--u))); /* right column */
   --cluster: calc(clamp(72px, 20vmin, 100px) + clamp(52px, 14vmin, 70px) + 12px + clamp(12px, 3vmin, 24px));
 }
 /* Boxity's toolbar has the menu (with Reset Character), so the touch layer's own
@@ -723,7 +709,7 @@
    circles covered the middle of a phone screen. The autos become two TRAIN / RACE
    tiles side by side and the boosts (one action) fan into an overlapping stack. */
 .touch-ui .hud {
-  --rw: max(calc(210 * var(--u)), calc(2 * var(--tap) + 6px));
+  --rw: max(calc(212 * var(--u)), calc(2 * var(--tap) + 6px));
 }
 .touch-ui .hud-autos {
   flex-direction: row;
@@ -783,12 +769,6 @@
   margin: 0;
   flex: none;
 }
-.touch-ui .hud:not(.portrait) .hud-timer {
-  flex: 0 1 var(--w);
-  min-width: 110px;
-  height: max(var(--tap), calc(65 * var(--u)));
-  margin-left: auto;
-}
 .touch-ui .hud:not(.portrait) .hud-daily {
   min-width: 64px;
   min-height: 46px;
@@ -819,39 +799,38 @@
   font-size: 12px;
   --o: 1px;
 }
-/* The menu tiles go 3 x 2 so the left column ends well above the joystick. */
-.touch-ui .hud:not(.portrait) .hud-grid {
+/* The menu tiles go 3 x 2 so the left column ends well above the joystick; on short
+   screens the counter pills sit side by side too. */
+.touch-ui .hud:not(.portrait) .hud-grid,
+.hud.short .hud-grid {
   grid-template-columns: repeat(3, var(--tile));
   gap: 6px;
   margin: 6px 0 0;
 }
-.touch-ui .hud.short .hud-left {
-  top: calc(var(--st) + 15 * var(--u) + var(--tap) + 8px);
+.hud.short .hud-stats {
+  flex-direction: row;
+  gap: 6px;
+}
+.hud.short .hud-left {
+  top: calc(var(--st) + 15 * var(--u) + max(var(--tap), calc(56 * var(--u))) + 8px); /* under the round buttons */
 }
 
 /* Phone landscape: the right column splits in two so it ends above the buttons. */
-.touch-ui .hud.short .hud-right {
-  top: calc(var(--st) + 15 * var(--u) + var(--tap) + 8px);
+.hud.short .hud-right {
+  top: calc(var(--st) + 15 * var(--u) + max(var(--tap), calc(56 * var(--u))) + 8px); /* under the round buttons */
   flex-direction: row-reverse;
   align-items: flex-start;
   gap: 10px;
 }
 
-/* --- Portrait: round buttons in a 3x2 grid, timer under the logo, daily between the columns. */
+/* --- Portrait: round buttons in a 3x2 grid, daily between the columns. No timer: Boxity's
+   toolbar spans the top edge and its chat feed takes the left under it. */
 .hud.portrait .hud-tr {
   display: grid;
   grid-template-columns: repeat(3, auto);
 }
-.hud.portrait .hud-timer {
-  --trw: calc(3 * max(var(--tap), calc(56 * var(--u))) + 28 * var(--u));
-  left: calc(20 * var(--u));
-  top: var(--timer-top);
-  width: calc(100% - var(--trw) - 35 * var(--u) - 16px);
-  height: max(30px, calc(65 * var(--u)));
-  margin-left: 0;
-}
 .hud.portrait {
-  --gap-mid: calc((222 * var(--u) + 100% - 30 * var(--u) - var(--rw)) / 2); /* centre of the gap between the columns */
+  --gap-mid: calc((246 * var(--u) + 100% - 17 * var(--u) - var(--rw)) / 2); /* centre of the gap between the columns */
   --timer-top: calc(15 * var(--u) + max(var(--tap), calc(55 * var(--u))) + 8px);
   --podium-top: calc(var(--timer-top) + max(30px, calc(65 * var(--u))) + 6px);
 }
@@ -876,20 +855,22 @@
 
 /* A window open on touch (body.uiw-open, uiWindow.js): the HUD and touch buttons only
    cluttered its edges and ran under its title (the backdrop takes every tap anyway).
-   The trophy / lightning counters stay so prices can be checked against them. */
-.touch-ui.uiw-open .hud > :not(.hud-right),
-.touch-ui.uiw-open .right-b,
+   The trophy / lightning counters stay so prices can be checked against them, moved to the
+   top-right corner (the top-left is Boxity's toolbar). */
+.touch-ui.uiw-open .hud > :not(.hud-left),
+.touch-ui.uiw-open .hud-grid,
 .touch-ui.uiw-open .touch-cluster,
 .touch-ui.uiw-open .joy-base {
   visibility: hidden;
 }
-.touch-ui.uiw-open .hud-right {
+.touch-ui.uiw-open .hud-left {
+  left: auto;
+  right: calc(var(--sr) + 8px);
   top: calc(var(--st) + 8px);
 }
 
 /* Scene mode (hud.setScene, e.g. the Trails scene): only the round buttons stay. */
 .hud.scene .hud-podium,
-.hud.scene .hud-timer,
 .hud.scene .hud-daily,
 .hud.scene .hud-left,
 .hud.scene .hud-right,

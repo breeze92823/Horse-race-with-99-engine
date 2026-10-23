@@ -70,24 +70,6 @@
 .hs-preview-pic.ready {
   opacity: 1;
 }
-.hs-engines {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: calc(330 * var(--uiw-u));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: calc(8 * var(--uiw-u));
-  font-size: calc(44 * var(--uiw-u));
-  line-height: 1;
-  --ow: 4;
-}
-.hs-rocket {
-  width: calc(54 * var(--uiw-u));
-  height: calc(54 * var(--uiw-u));
-  transform: rotate(40deg);
-}
 .hs-rocket svg,
 .hs-lock svg,
 .hs-cur svg,
@@ -302,11 +284,6 @@
   .hs-preview-pic {
     left: calc(-24 * var(--uiw-u));
     top: calc(-60 * var(--uiw-u));
-  }
-  .hs-engines {
-    left: calc(270 * var(--uiw-u));
-    top: calc(72 * var(--uiw-u));
-    justify-content: flex-start;
   }
   .hs-stats {
     left: calc(272 * var(--uiw-u));

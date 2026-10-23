@@ -7,10 +7,8 @@
 //  - breathing: at the gallop a horse breathes once per stride, blowing out as the front legs
 //    land; at the trot every other stride
 //  - a snort now and then while standing (a lip-fluttered blow)
-//  - the rocket boosters: a roar of filtered noise and a low rumble rising with thrust
-// Mixing for a long listen: standing still the boosters settle to a quiet hiss; holding a steady
-// speed in a race everything eases back (AUDIO.mount.settle) and taps, boosts and the start bring
-// it forward again.
+// Mixing for a long listen: holding a steady speed in a race the hooves ease back
+// (AUDIO.mount.settle) and taps, boosts and the start bring them forward again.
 import { AUDIO } from '../config.js'
 import { A, now, onStart, voice } from './core.js'
 import { burst, modal, rnd, tone, vary } from './synth.js'
@@ -21,11 +19,7 @@ const HOOF = [[1, 1, 0.05], [2.4, 0.4, 0.025], [3.9, 0.15, 0.012]]
 
 const s = {
   ok: false,
-  roarGain: null,
-  roarFilter: null,
-  rumbleGain: null,
-  hooves: null, // the hoofbeats' and breaths' level (presence x visibility)
-  presence: 1, // mix level: eases to M.settle at a steady race speed, M.idleLevel standing still
+  hooves: null, // the hoofbeats' and breaths' level (visibility x the race's excitement)
   blip: 0, // tap boost flare that decays
   revAt: -1, // race start surge until this time
   stride: 0, // strides since the last breath (trot: every other)
@@ -33,13 +27,6 @@ const s = {
   stillSince: 0, // audio clock time the horse last moved (or raced)
 }
 
-function loop(kind, stereo = false) {
-  const src = A.ctx.createBufferSource()
-  src.buffer = stereo ? (kind === 'brown' ? A.noise.brownStereo : A.noise.pinkStereo) : A.noise[kind]
-  src.loop = true
-  src.start(0, Math.random() * (src.buffer.duration - 0.1))
-  return src
-}
 const filt = (type, f, q = 0.7) => {
   const b = A.ctx.createBiquadFilter()
   b.type = type
@@ -54,13 +41,7 @@ const gain = (v) => {
 }
 
 onStart((ctx) => {
-  const bus = A.engine
-  // Booster roar: stereo pink noise, band-passed, rising with thrust; a low rumble under it.
-  s.roarFilter = filt('bandpass', 300, 0.5)
-  s.roarGain = gain(0)
-  loop('pink', true).connect(s.roarFilter).connect(s.roarGain).connect(bus)
-  s.rumbleGain = gain(0)
-  loop('brown', true).connect(filt('lowpass', 140, 0.7)).connect(s.rumbleGain).connect(bus)
+  const bus = A.mount
   // Hoofbeats and breaths go through one level, softened a little up top for the long listen.
   s.hooves = gain(0)
   const soft = filt('highshelf', 3000, 0.7)
@@ -117,11 +98,11 @@ function snort(t) {
   burst({ t: t + 0.35, noise: 'pink', f: 600, f2: 380, q: 1, a: 0.08, d: 0.3, gain: M.snort * 0.35, bus: s.hooves })
 }
 
-// Tap boost: the boosters flare.
+// Tap boost: the hooves come forward in the mix for a moment.
 export function blip() {
   s.blip = Math.min(1, s.blip + 0.35)
 }
-// Race start: the boosters surge for a moment.
+// Race start: the same, a little longer.
 export function rev() {
   if (A.ctx) s.revAt = A.ctx.currentTime + 1.2
 }
@@ -132,19 +113,11 @@ const K = 0.06 // smoothing time constant for every continuous param (s)
 export function update(dt, st) {
   if (!s.ok || !A.ctx) return
   const t = A.ctx.currentTime
-  const f = Math.min(1, st.speed / Math.max(1, st.top))
   s.blip *= Math.exp(-4 * dt)
   const surge = t < s.revAt ? (s.revAt - t) / 1.2 : 0
-  // Presence: racing at a steady speed it all eases back so it never wears on the ear; a tap, a
-  // boost or the start bring it forward. In the lobby, standing still = a quiet hiss.
+  // Racing at a steady speed the hooves ease back so they never wear on the ear; a tap, a boost or
+  // the start bring them forward.
   const excite = Math.min(1, surge + s.blip * 1.5 + st.boost * 3)
-  const goal = st.racing ? Math.max(M.settle, excite, 1 - f) : M.idleLevel + (1 - M.idleLevel) * Math.max(st.moving, f)
-  s.presence += (goal - s.presence) * (1 - Math.exp(-dt / (goal > s.presence ? 0.15 : M.settleTime)))
-  const level = (st.visible ? 1 : 0) * s.presence
-  const thrust = st.racing ? 0.4 + f * 0.6 + st.boost * 1.6 + s.blip * 0.5 + surge * 0.4 : Math.max(st.moving, f) * 0.45 + 0.15
-  s.roarFilter.frequency.setTargetAtTime(200 + thrust * 700, t, K)
-  s.roarGain.gain.setTargetAtTime(level * M.roar * thrust * thrust, t, K)
-  s.rumbleGain.gain.setTargetAtTime(level * M.rumble * (0.3 + thrust), t, K)
   s.hooves.gain.setTargetAtTime((st.visible ? 1 : 0) * (st.racing ? Math.max(M.settle, excite) : 1) * M.hooves, t, K)
 
   // Standing about in the lobby: a snort every so often (timed on the audio clock, not frames).

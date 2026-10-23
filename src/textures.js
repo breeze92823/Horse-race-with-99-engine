@@ -330,29 +330,62 @@ export function paintSparkle(size = 64) {
   return c
 }
 
-// Treadmill belt for the training lanes: dark ribbed rubber, glowing chevrons
-// down the middle and a bright stripe along each edge (it is also the
-// emissive map, so the chevrons and stripes glow). Tiles along v (the belt).
+// Treadmill belt for the training lanes: dark ribbed rubber with two bold chevrons in the lane's
+// colour pointing at canvas top (the belt's near end; it is also the emissive map, so they glow).
+// Tiles along v (the belt).
 export function paintTreadmill(glow = '#4fd8ff', size = 128) {
   const c = document.createElement('canvas')
   c.width = c.height = size
   const ctx = c.getContext('2d')
-  ctx.fillStyle = '#1b2030'
+  ctx.fillStyle = '#161a24'
   ctx.fillRect(0, 0, size, size)
-  ctx.fillStyle = '#262c3f' // rubber ribs across the belt
+  ctx.fillStyle = '#20263a' // rubber ribs across the belt
   for (let y = 0; y < size; y += 8) ctx.fillRect(0, y, size, 3)
-  ctx.strokeStyle = glow
-  ctx.lineWidth = size * 0.07
   ctx.lineJoin = 'round'
-  for (const y0 of [0.15, 0.65]) {
+  ctx.lineCap = 'round'
+  for (const y0 of [0.12, 0.62]) {
+    for (const [w, col] of [[0.16, glow], [0.07, '#ffffff']]) {
+      ctx.strokeStyle = col
+      ctx.globalAlpha = col === glow ? 1 : 0.55
+      ctx.lineWidth = size * w
+      ctx.beginPath()
+      ctx.moveTo(size * 0.2, size * (y0 + 0.24))
+      ctx.lineTo(size * 0.5, size * y0)
+      ctx.lineTo(size * 0.8, size * (y0 + 0.24))
+      ctx.stroke()
+    }
+  }
+  ctx.globalAlpha = 1
+  return c
+}
+
+// Swirling portal fill: spiral arms of `color` round a bright core, fading out at the rim.
+export function paintSwirl(color = '#3dff6a', size = 256) {
+  const c = document.createElement('canvas')
+  c.width = c.height = size
+  const ctx = c.getContext('2d')
+  const r = size / 2
+  const bg = ctx.createRadialGradient(r, r, 0, r, r, r)
+  bg.addColorStop(0, '#ffffff')
+  bg.addColorStop(0.25, color)
+  bg.addColorStop(1, '#03140a')
+  ctx.fillStyle = bg
+  ctx.fillRect(0, 0, size, size)
+  ctx.translate(r, r)
+  ctx.lineCap = 'round'
+  for (let arm = 0; arm < 4; arm++) {
+    ctx.strokeStyle = arm % 2 ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.3)'
+    ctx.lineWidth = size * 0.035
     ctx.beginPath()
-    ctx.moveTo(size * 0.3, size * (y0 + 0.2))
-    ctx.lineTo(size * 0.5, size * y0)
-    ctx.lineTo(size * 0.7, size * (y0 + 0.2))
+    for (let i = 0; i <= 40; i++) {
+      const t = i / 40
+      const a = arm * (Math.PI / 2) + t * Math.PI * 2.2
+      const rr = t * r * 0.95
+      if (i === 0) ctx.moveTo(Math.cos(a) * rr, Math.sin(a) * rr)
+      else ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr)
+    }
     ctx.stroke()
   }
-  ctx.fillStyle = glow
-  for (const x of [0.04, 0.9]) ctx.fillRect(size * x, 0, size * 0.06, size)
   return c
 }
 
@@ -378,6 +411,92 @@ export function paintQuilt(base = '#ff5fa8', size = 128) {
   ctx.lineTo(0, size / 2)
   ctx.closePath()
   ctx.stroke()
+  return c
+}
+
+// Sunny plaza sand: pale yellow fbm cut into big flat tiles by thin darker cracks (a tileable
+// Voronoi on a jittered `cells` x `cells` grid). Tileable both ways.
+export function paintSand(size = 512, seed = 515, cells = 4, lo = '#ffcc3c', hi = '#ffdc5c', crack = '#f2b636') {
+  const rand = mulberry32(seed)
+  const field = fbm(size, 5, 4, seed)
+  const pts = []
+  for (let j = 0; j < cells; j++) for (let i = 0; i < cells; i++) pts.push([(i + 0.15 + rand() * 0.7) / cells, (j + 0.15 + rand() * 0.7) / cells])
+  const c = canvas(size)
+  const ctx = c.getContext('2d')
+  const img = ctx.createImageData(size, size)
+  const [loC, hiC, crC] = [hexRgb(lo), hexRgb(hi), hexRgb(crack)]
+  const tone = pts.map(() => rand() * 0.25) // each tile a shade lighter or darker
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const u = x / size
+      const v = y / size
+      const ci = Math.floor(u * cells)
+      const cj = Math.floor(v * cells)
+      let d1 = 9
+      let d2 = 9
+      let near = 0
+      for (let dj = -1; dj <= 1; dj++)
+        for (let di = -1; di <= 1; di++) {
+          const ii = (ci + di + cells) % cells
+          const jj = (cj + dj + cells) % cells
+          const [px, py] = pts[jj * cells + ii]
+          const dx = px + Math.floor((ci + di) / cells) - u
+          const dy = py + Math.floor((cj + dj) / cells) - v
+          const d = dx * dx + dy * dy
+          if (d < d1) {
+            d2 = d1
+            d1 = d
+            near = jj * cells + ii
+          } else if (d < d2) d2 = d
+        }
+      const i = y * size + x
+      const edge = (Math.sqrt(d2) - Math.sqrt(d1)) * cells // 0 on a crack
+      const t = Math.min(1, Math.max(0, field[i] * 0.6 + 0.35 - tone[near] * 0.6))
+      const k = edge < 0.03 ? 0.7 : edge < 0.055 ? 0.25 : 0
+      for (let ch = 0; ch < 3; ch++) img.data[i * 4 + ch] = (loC[ch] + (hiC[ch] - loC[ch]) * t) * (1 - k) + crC[ch] * k
+      img.data[i * 4 + 3] = 255
+    }
+  }
+  ctx.putImageData(img, 0, 0)
+  return c
+}
+
+// Road asphalt: dark grey fbm with light grit specks. Tileable both ways.
+export function paintAsphalt(size = 256, seed = 404, lo = '#4f525a', hi = '#6a6d75') {
+  const rand = mulberry32(seed)
+  const field = fbm(size, 8, 4, seed)
+  const c = canvas(size)
+  const ctx = c.getContext('2d')
+  const img = ctx.createImageData(size, size)
+  const [loC, hiC] = [hexRgb(lo), hexRgb(hi)]
+  for (let i = 0; i < size * size; i++) {
+    const t = Math.min(1, Math.max(0, field[i] * 1.1 - 0.05 + (rand() - 0.5) * 0.18))
+    for (let k = 0; k < 3; k++) img.data[i * 4 + k] = loC[k] + (hiC[k] - loC[k]) * t
+    img.data[i * 4 + 3] = 255
+  }
+  ctx.putImageData(img, 0, 0)
+  return c
+}
+
+// Diagonal two-colour stripes (barriers, candy canes, tent roofs): `n` stripe pairs across the
+// width, tileable.
+export function paintStripes(a = '#e8262b', b = '#ffffff', n = 2, size = 128, slant = 1) {
+  const c = canvas(size)
+  const ctx = c.getContext('2d')
+  ctx.fillStyle = b
+  ctx.fillRect(0, 0, size, size)
+  ctx.fillStyle = a
+  const w = size / n
+  for (let i = -n * 2; i < n * 2; i++) {
+    const x = i * w
+    ctx.beginPath()
+    ctx.moveTo(x, 0)
+    ctx.lineTo(x + w / 2, 0)
+    ctx.lineTo(x + w / 2 + size * slant, size)
+    ctx.lineTo(x + size * slant, size)
+    ctx.closePath()
+    ctx.fill()
+  }
   return c
 }
 

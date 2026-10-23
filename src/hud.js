@@ -1,9 +1,10 @@
 // The on-screen HUD, laid out after the reference screenshot (1920x992):
 //   top-centre   - race timer, 1st/2nd/3rd podium under it
 //   top-right    - round buttons (spin wheel, calendar)
-//   left         - CLAIM! pill + grid of menu tiles (Rebirth, Pets, Horses, ...)
-//   right        - trophies / wins, AUTO TRAIN / AUTO RACE, boosts
-//   bottom       - the three-row race distance bar with every racer's head
+//   left         - trophies / wins pills + grid of icon-only menu tiles (Rebirth, Pets, Horses, ...)
+//   right        - CLAIM! pill, AUTO RACE / AUTO TRAIN
+//   bottom       - boosts over the left end of the three-row race distance bar with every
+//                  racer's head (on touch the boosts stay in the right column, off the joystick)
 // Everything is sized in reference pixels times --u (set on resize), so it keeps
 // the reference proportions on any screen; hud.css adapts it for touch + portrait.
 // The top-left corner is Boxity's (toolbar + chat feed): blocks slide down clear of it (setReserved).
@@ -55,34 +56,23 @@ function button(className, html, fn) {
 
 const dot = () => el('span', 'hud-dot')
 
+// Icon-only like the reference; the name is the button's label and tooltip.
 function tile(name, label, icon, fn, extra) {
   const b = button(`hud-tile tile-${name}`, `<span class="tile-icon">${icon}</span>`, fn)
-  b.append(text('tile-label', label))
+  b.title = label
+  b.setAttribute('aria-label', label)
   if (extra) b.append(extra)
   return b
 }
 
-function formatTime(ms) {
-  const m = Math.floor(ms / 60000)
-  const s = Math.floor(ms / 1000) % 60
-  const r = Math.floor(ms) % 1000
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(r).padStart(3, '0')}`
-}
-
-// actions: { claim, daily (the calendar), rebirth, pets, horses, engine, partner, trail,
+// actions: { claim, daily (the calendar), rebirth, pets, horses, partner, trail,
 // autoTrain(on), autoRace(on), boosts (the three boost circles) }, all optional; a menu
 // tile calls the action named after it.
 export function createHud(actions = {}) {
   const root = el('div', 'hud')
   const d = HUD.design
 
-  // --- Timer --------------------------------------------------------------------------
-  const timer = el('div', 'hud-timer')
-  const timerText = text('timer-text', '00:00.000')
-  timer.append(timerText)
-
-  // --- Podium: the three racers furthest along, under the timer ------------------------
-  // (in the DOM before the top row so the timer's panel covers the ribbons' tops)
+  // --- Podium: the three racers furthest along ------------------------------------------
   const podium = el('div', 'hud-podium')
   const medals = ['1st', '2nd', '3rd'].map((label, i) => {
     const m = el('div', `medal medal-${i + 1}`)
@@ -107,26 +97,8 @@ export function createHud(actions = {}) {
   // The wheel (Spin wheel) likewise, while a spin is ready (setSpinCount).
   const wheel = tr.querySelector('.round-wheel')
 
-  // --- Left: CLAIM + tiles --------------------------------------------------------------------
+  // --- Left: stat pills + tiles ---------------------------------------------------------------
   const left = el('div', 'hud-left')
-  const claim = button('hud-claim', `<span class="claim-gift">${ICONS.gift}</span>`, actions.claim)
-  const claimBadge = el('span', 'claim-badge')
-  const claimCount = text('', '0')
-  claimBadge.append(claimCount)
-  claim.append(claimBadge, gradText('claim-text', 'CLAIM!'))
-  const grid = el('div', 'hud-grid')
-  grid.append(
-    tile('rebirth', 'Rebirth', ICONS.rebirth, actions.rebirth),
-    tile('pets', 'Pets', ICONS.pets, actions.pets),
-    tile('horses', 'Horses', ICONS.horses, actions.horses),
-    tile('engine', 'Engine', ICONS.engine, actions.engine),
-    tile('partner', 'Partner', ICONS.partner, actions.partner),
-    tile('trail', 'Trail', ICONS.trail, actions.trail),
-  )
-  left.append(claim, grid)
-
-  // --- Right: stats, autos, boosts -------------------------------------------------------
-  const right = el('div', 'hud-right')
 
   const stats = el('div', 'hud-stats')
   const statEls = {}
@@ -136,9 +108,28 @@ export function createHud(actions = {}) {
   ]) {
     const row = el('div', `hud-stat stat-${key}`)
     statEls[key] = gradText('stat-num', '0')
-    row.append(statEls[key], el('span', 'stat-icon', ICONS[icon]))
+    row.append(el('span', 'stat-icon', ICONS[icon]), statEls[key])
     stats.append(row)
   }
+
+  const grid = el('div', 'hud-grid')
+  grid.append(
+    tile('rebirth', 'Rebirth', ICONS.rebirth, actions.rebirth),
+    tile('pets', 'Pets', ICONS.pets, actions.pets),
+    tile('horses', 'Horses', ICONS.horses, actions.horses),
+    tile('partner', 'Partner', ICONS.partner, actions.partner),
+    tile('trail', 'Trail', ICONS.trail, actions.trail),
+  )
+  left.append(stats, grid)
+
+  // --- Right: CLAIM, autos (and the boosts on touch) ---------------------------------------
+  const right = el('div', 'hud-right')
+
+  const claim = button('hud-claim', `<span class="claim-gift">${ICONS.gift}</span>`, actions.claim)
+  const claimBadge = el('span', 'claim-badge')
+  const claimCount = text('', '0')
+  claimBadge.append(claimCount)
+  claim.append(claimBadge, gradText('claim-text', 'CLAIM!'))
 
   const autos = el('div', 'hud-autos')
   // fn(on) is told the new state. "AUTO " is its own span so touch screens can drop it
@@ -152,7 +143,7 @@ export function createHud(actions = {}) {
     b.append(t)
     return b
   }
-  autos.append(auto('TRAIN', 'bolt', actions.autoTrain), auto('RACE', 'trophy', actions.autoRace))
+  autos.append(auto('RACE', 'trophy', actions.autoRace), auto('TRAIN', 'bolt', actions.autoTrain))
 
   const boosts = el('div', 'hud-boosts')
   for (const [cls, icon, label] of [
@@ -164,16 +155,17 @@ export function createHud(actions = {}) {
     b.append(text('boost-label', label))
     boosts.append(b)
   }
-  // Two groups so a short touch screen can put them side by side (hud.css).
+  // Two groups so a short touch screen can put them side by side (hud.css). The boosts join
+  // right-b on touch and sit over the bars' left end otherwise (placeBoosts).
   const rightA = el('div', 'right-a')
   const rightB = el('div', 'right-b')
-  rightA.append(stats)
-  rightB.append(autos, boosts)
+  rightA.append(claim)
+  rightB.append(autos)
   right.append(rightA, rightB)
 
   // --- Bottom: race distance bars ----------------------------------------------------------
   const bottom = el('div', 'hud-bottom')
-  // Bars span 438..1482 px of the reference; segment edges come from HUD.progress.
+  // Segment edges (HUD.progress) are authored on a 438..1482 px span; hud.css sets the drawn width.
   const barLeft = 438
   const barWidth = 1482 - barLeft
   const bars = el('div', 'hud-bars')
@@ -227,8 +219,18 @@ export function createHud(actions = {}) {
 
   bottom.append(bars)
 
+  // The boosts' home: over the bars' left end, or in the right column on touch, where the
+  // left of the screen belongs to the joystick (body.touch-ui comes and goes with the input),
+  // and on short screens, where the left column reaches down to the bars.
+  function placeBoosts() {
+    const side = document.body.classList.contains('touch-ui') || root.classList.contains('short')
+    const home = side ? rightB : bars
+    if (boosts.parentElement !== home) home.append(boosts)
+  }
+  placeBoosts()
+
   const top = el('div', 'hud-top')
-  top.append(tr) // the race timer (`timer`) is kept off-screen: not shown in the HUD
+  top.append(tr)
   root.append(podium, top, left, right, bottom)
   document.body.appendChild(root)
 
@@ -271,7 +273,10 @@ export function createHud(actions = {}) {
   }
   const sized = new ResizeObserver(relayout)
   for (const e of avoiders) sized.observe(e)
-  const classes = new MutationObserver(relayout)
+  const classes = new MutationObserver(() => {
+    placeBoosts()
+    relayout()
+  })
   classes.observe(root, { attributes: true, attributeFilter: ['class'] })
   classes.observe(document.body, { attributes: true, attributeFilter: ['class'] })
 
@@ -403,9 +408,6 @@ export function createHud(actions = {}) {
   setPfp('')
   setDistance(0)
 
-  const start = performance.now()
-  let shown = ''
-  let timerMs = null // set by setTimer (a race's own clock); null = time since load
   return {
     root,
     bottom, // race.js's widgets go in here, above the bars column
@@ -440,13 +442,8 @@ export function createHud(actions = {}) {
       reserved = areas
       relayout()
     },
-    // Show this time (ms) on the timer instead of the time since load; null goes back.
-    setTimer(ms) {
-      timerMs = ms
-    },
-    update() {
-      const t = formatTime(timerMs ?? performance.now() - start)
-      if (t !== shown) timerText.textContent = shown = t
-    },
+    // The race timer was removed from the HUD; race.js / main.js still call these.
+    setTimer() {},
+    update() {},
   }
 }
