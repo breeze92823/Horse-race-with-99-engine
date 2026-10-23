@@ -161,7 +161,7 @@ class Remote {
 
     const grounded = Math.abs(this.vy) < 0.5
     this.horse.update(dt, b.speed, 0, t, 0, grounded, this.vy)
-    this.animator?.update(dt, { grounded, speed: b.speed, verticalVelocity: this.vy, turn: 0, riding: true })
+    this.animator?.update(dt, { grounded, speed: b.speed, verticalVelocity: this.vy, turn: 0, riding: true, mount: this.horse.motion })
     if (near) {
       this.companions.update(dt, t, g.position.x, g.position.y, g.position.z, g.rotation.y)
       if (this.applied.trailShown) this.trail.update(dt, camera, scrollSpeed)

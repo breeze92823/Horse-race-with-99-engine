@@ -405,16 +405,16 @@ renderer.setAnimationLoop(() => {
     trailsScene.stage(camera, playerGroup)
     playerGroup.visible = true
     horse.update(dt, TRAILS.showcase.speed, 0, elapsed)
-    animator?.update(dt, { grounded: true, speed: TRAILS.showcase.speed, verticalVelocity: 0, turn: 0, riding: true })
+    animator?.update(dt, { grounded: true, speed: TRAILS.showcase.speed, verticalVelocity: 0, turn: 0, riding: true, mount: horse.motion })
   } else if (racing) {
     playerGroup.visible = true // the horse stays in view; in first person only the rider is hidden
     horse.rider.visible = getMode() !== 'player'
     horse.update(dt, race.horseSpeed(), inputState.move.x, elapsed, race.tapBoost())
-    animator?.update(dt, { grounded: true, speed: race.horseSpeed(), verticalVelocity: 0, turn: 0, riding: true })
+    animator?.update(dt, { grounded: true, speed: race.horseSpeed(), verticalVelocity: 0, turn: 0, riding: true, mount: horse.motion })
   } else if (getMode() === 'character') {
     horse.update(dt, speed, 0, elapsed, 0, player.grounded, player.velocity.y) // it reads its turns off its own heading
     // Riding: the avatar sits in the saddle; the horse walks, gallops and jumps under it.
-    animator?.update(dt, { grounded: player.grounded, speed, verticalVelocity: player.velocity.y, turn: 0, riding: true })
+    animator?.update(dt, { grounded: player.grounded, speed, verticalVelocity: player.velocity.y, turn: 0, riding: true, mount: horse.motion })
   }
 
   if (racing) race.camera(camera, dt)

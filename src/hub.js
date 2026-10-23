@@ -66,7 +66,8 @@ export function createHub(scene, windows) {
         const s = 0.35 + ((elapsed * 0.6 + p.phase) % 1) * 0.65 // a ring rippling out to the rim
         p.inner.scale.set(s, s, 1)
         p.tag.position.y = HUB.labelY + Math.sin(t) * 0.12
-        const inside = !!pos && Math.hypot(pos.x - p.spec.x, pos.z - p.spec.z) < R
+        if (!pos) continue // pads off: keep "inside", so leaving a scene on a pad doesn't re-fire it
+        const inside = Math.hypot(pos.x - p.spec.x, pos.z - p.spec.z) < R
         if (inside && !p.inside && !anyWindowOpen()) {
           sfx.padEnter()
           windows[p.spec.open]?.()

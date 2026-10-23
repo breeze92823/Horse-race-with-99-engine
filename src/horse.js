@@ -14,7 +14,8 @@ import { BODY_PIVOT, buildHorseParts, EAR_PIVOTS, HEAD_PIVOT, LEGS, NECK_PIVOT, 
 // and crouches; the body and neck ride springs, so the weight rocks back on a push-off, sits down
 // into a halt and settles after it; turns (measured off the horse's own heading) lean the body and
 // bend the neck into them; standing, it breathes, flicks its ears and fidgets. The avatar rides on
-// `horse.rider`, inside the body, so it bobs and leans with it.
+// `horse.rider`, inside the body, so it bobs and leans with it, and reads `horse.motion` (the
+// gait phase, push-off, halt, jump and turn this frame) to ride each of them (avatar/animator.js).
 
 // Frees a group's own geometries and materials (a remote horse leaving).
 export function disposeGroup(group) {
@@ -193,10 +194,15 @@ export function createHorse({ lite = false, onFootfall = null } = {}) {
   let idle = null // the fidget playing: { kind, t, dur, side }
   let nextIdle = 1.5 + Math.random() * 2
   const rnd = (lo, hi) => lo + Math.random() * (hi - lo)
+  // What the rider reacts to, rewritten each update(): phase 0..1 of the stride, gait shares
+  // (0..1, x moving), drive / brake 0..1, air 0..1, bend -1..1 (the
+  // sign of the body's lean into a turn, scaled by speed).
+  const motion = { phase: 0, moving: 0, trot: 0, gallop: 0, drive: 0, brake: 0, air: 0, bend: 0 }
   return {
     root,
     rider,
     seat,
+    motion,
     setLook,
     // Frees this horse's geometry and materials (a display horse or picture done with).
     dispose() {
@@ -388,6 +394,15 @@ export function createHorse({ lite = false, onFootfall = null } = {}) {
         t.pivot.rotation.x = raise * share + moving * wg * 0.07 * Math.sin(elapsed * 13 - i * 1.1) - brake * 0.08 * (i === 0)
         t.pivot.rotation.z = swish * (i ? 0.6 : 1) * Math.sin(elapsed * rate + Math.sin(elapsed * 0.37) * 2 - i * 0.8) - tailBend * (0.2 - i * 0.04)
       })
+
+      motion.phase = phase
+      motion.moving = moving
+      motion.trot = wt * moving
+      motion.gallop = wg * moving
+      motion.drive = drive
+      motion.brake = brake
+      motion.air = air
+      motion.bend = bendS * Math.min(1, speed / 6)
 
       if (dust) {
         const kick = Math.max(smooth(HORSE.dust.from, HORSE.dust.full, speed), drive * 0.8, brake * Math.min(1, speed / 3)) * (1 - air)

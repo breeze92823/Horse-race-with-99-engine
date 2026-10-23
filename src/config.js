@@ -988,7 +988,36 @@ export const ANIM = {
   },
   // Seated in the saddle (horse.js carries the bob and lean): thighs forward and splayed round the
   // barrel, shins hanging, hands forward on the reins; leans forward up to `lean` by `leanSpeed` m/s.
+  // On top of that the rider rides what the horse does (horse.motion): the weight sits on three
+  // damped springs (side, up, fore-aft; [w rad/s, damping]) driven by the saddle's acceleration, so
+  // it rocks back on a push-off, tips forward on a halt and bounces with the stride (`sink` / `lift`
+  // m, `pitch` / `roll` rad per m, `dangle` / `swing` = shins per m, within `knee`). The trot posts (`post` m), the
+  // gallop rises into a two-point seat (`gallop`: lift, extra lean, knees, hands pumping with the
+  // stride); a jump stands in the stirrups and gives the hands forward (`jump`); a push-off kicks
+  // the heels (`kick`, Hz); a halt pulls the reins and sits back (`pull`); turns lean and look into
+  // them (`turn`). Standing it looks round and now and then pats the horse's neck (`fidgetEvery` s).
   ride: {
+    spring: [[8, 0.5], [14, 0.35], [7, 0.45]],
+    accelSmooth: 14,
+    maxAccel: 40,
+    maxSway: 0.25,
+    sink: 0.05,
+    lift: 0.06,
+    pitch: 2.4,
+    slump: 3,
+    maxPitch: deg(20),
+    roll: 2,
+    dangle: deg(120),
+    swing: deg(120),
+    knee: [deg(8), deg(110)], // the knee's range
+    post: 0.05,
+    gallop: { lift: 0.04, lean: deg(14), knee: deg(18), pump: deg(16), nod: deg(5) },
+    jump: { lift: 0.12, lean: deg(24), reach: deg(34), knee: deg(24) },
+    kick: { amount: deg(38), rate: 3.4 },
+    pull: { arm: deg(30), elbow: deg(34), lean: deg(14), brace: deg(16) },
+    turn: { lean: deg(9), look: deg(20) },
+    look: deg(45),
+    fidgetEvery: [2.5, 6],
     pose: {
       LegL1: { x: deg(-40), y: deg(20), z: deg(30) }, LegR1: { x: deg(-40), y: deg(-20), z: deg(-30) },
       LegL2: { x: deg(45) }, LegR2: { x: deg(45) },

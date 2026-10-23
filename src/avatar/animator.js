@@ -3,7 +3,10 @@
 // airborne / landing are blended through pose buffers; the walk and run are ONE
 // cycle at two depths, its phase advancing with distance travelled so the feet
 // stay planted at any speed. Writes only to bones and the avatar root's
-// rotation / position.y (the player group owns world placement).
+// rotation / position.y (the player group owns world placement). In the saddle (`ride`) the rider
+// follows the horse: springs on the saddle's own acceleration plus the horse's gait, push-off,
+// halt, jump and turns (horse.js `motion`, passed as input.mount).
+import { Quaternion, Vector3 } from 'three'
 import { ANIM } from '../config.js'
 import { PlayerRig, PoseBuffer } from './rig.js'
 
@@ -18,6 +21,11 @@ const kneeCurve = (phase) => {
 }
 
 const L = ANIM.locomotion
+const NO_MOUNT = { phase: 0, moving: 0, trot: 0, gallop: 0, drive: 0, brake: 0, air: 0, bend: 0 }
+const tmpP = new Vector3()
+const tmpV = new Vector3()
+const tmpA = new Vector3()
+const tmpQ = new Quaternion()
 
 export function makeAnimator(root) {
   if (!root) return null
@@ -44,6 +52,18 @@ class PlayerAnimator {
     this.idleTime = 0
     this.airTime = 0
     this.bank = 0
+    // Riding: the saddle's last world position / velocity, its smoothed acceleration (saddle frame),
+    // the side / up / fore-aft springs, the last speed and the standing fidget.
+    this.seatLast = new Vector3()
+    this.seatVel = new Vector3()
+    this.seatAcc = new Vector3()
+    this.seatFresh = true
+    this.springs = [0, 1, 2].map(() => ({ x: 0, v: 0 }))
+    this.lastSpeed = 0
+    this.look = 0
+    this.lookTo = 0
+    this.fidget = null // { kind: 'pat', t, dur }
+    this.nextFidget = 3
   }
 
   dispose() {
@@ -52,7 +72,8 @@ class PlayerAnimator {
     this.root.position.y = 0
   }
 
-  // input: { grounded, speed, verticalVelocity, turn (-1..1), riding (seated on the horse) }
+  // input: { grounded, speed, verticalVelocity, turn (-1..1), riding (seated on the horse),
+  //   mount (the horse's `motion`, while riding) }
   update(dt, input) {
     if (!(dt > 0)) return
     this.stateTime += dt
@@ -112,16 +133,9 @@ class PlayerAnimator {
         this.writeLocomotion(t, input.speed)
         break
       }
-      case 'ride': {
-        this.idleTime += dt
-        const R = ANIM.ride
-        t.applyDefinition(R.pose)
-        const breath = Math.sin(this.idleTime * ANIM.idle.breathFrequency * TAU)
-        t.add('Spine1', clamp(input.speed / R.leanSpeed, 0, 1) * R.lean + breath * R.breath)
-        t.add('Neck1', -clamp(input.speed / R.leanSpeed, 0, 1) * R.lean * 0.6)
-        t.bobY = 0
+      case 'ride':
+        this.writeRide(t, dt, input)
         break
-      }
       case 'airborne': {
         const rising = clamp(input.verticalVelocity / ANIM.airborne.velocityReference, -1, 1)
         t.applyDefinition(ANIM.airborne.fall)
@@ -137,6 +151,114 @@ class PlayerAnimator {
         break
       }
     }
+  }
+
+  // The saddle's acceleration in its own frame (side, up, fore-aft) pushes the weight about on three
+  // springs. Fore-aft comes from the speed (a racing horse stays put while the world scrolls).
+  rideSprings(dt, speed) {
+    const R = ANIM.ride
+    const seat = this.root.parent
+    if (!seat) return
+    seat.getWorldPosition(tmpP)
+    seat.getWorldQuaternion(tmpQ)
+    // A respawn / teleport / first frame is not a motion.
+    if (this.seatFresh || tmpP.distanceToSquared(this.seatLast) > 9) {
+      this.seatFresh = false
+      this.seatLast.copy(tmpP)
+      this.seatVel.set(0, 0, 0)
+      this.seatAcc.set(0, 0, 0)
+      this.lastSpeed = speed
+      for (const s of this.springs) s.x = s.v = 0
+    }
+    tmpV.copy(tmpP).sub(this.seatLast).divideScalar(dt)
+    this.seatLast.copy(tmpP)
+    tmpA.copy(tmpV).sub(this.seatVel).divideScalar(dt).applyQuaternion(tmpQ.invert())
+    this.seatVel.copy(tmpV)
+    tmpA.z = (speed - this.lastSpeed) / dt
+    this.lastSpeed = speed
+    tmpA.clampLength(0, R.maxAccel)
+    this.seatAcc.lerp(tmpA, 1 - Math.exp(-R.accelSmooth * dt))
+    // x'' = -a - w^2 x - 2 zeta w x', sub-stepped.
+    const steps = Math.ceil(dt * 240)
+    const h = dt / steps
+    for (let i = 0; i < 3; i++) {
+      const [w, zeta] = R.spring[i]
+      const s = this.springs[i]
+      const drive = -this.seatAcc.getComponent(i)
+      for (let k = 0; k < steps; k++) {
+        s.v += (drive - w * w * s.x - 2 * zeta * w * s.v) * h
+        s.x += s.v * h
+      }
+      s.x = clamp(s.x, -R.maxSway, R.maxSway)
+    }
+  }
+
+  writeRide(out, dt, input) {
+    const R = ANIM.ride
+    const m = input.mount ?? NO_MOUNT
+    this.idleTime += dt
+    this.rideSprings(dt, input.speed)
+    const side = this.springs[0].x
+    const up = this.springs[1].x
+    const fore = this.springs[2].x
+    const still = 1 - m.moving
+    const c = m.phase * TAU
+    const G = R.gallop
+    const J = R.jump
+    const P = R.pull
+    const gallop = m.gallop * (1 - m.air)
+    const brake = m.brake * (1 - m.air)
+
+    // Standing: look round, now and then lean down and pat the horse's neck.
+    if (this.fidget) {
+      this.fidget.t += dt
+      if (this.fidget.t >= this.fidget.dur || m.moving > 0.4) this.fidget = null
+    }
+    if ((this.nextFidget -= dt) <= 0) {
+      this.nextFidget = R.fidgetEvery[0] + Math.random() * (R.fidgetEvery[1] - R.fidgetEvery[0])
+      if (still > 0.9 && !this.fidget && Math.random() < 0.35) {
+        this.fidget = { kind: 'pat', t: 0, dur: 1.8 }
+        this.lookTo = R.look * 0.2
+      } else this.lookTo = still > 0.9 && Math.random() < 0.7 ? (Math.random() * 2 - 1) * R.look : 0
+    }
+    if (m.moving > 0.4) this.lookTo = 0
+    this.look += (this.lookTo - this.look) * (1 - Math.exp(-3 * dt))
+    const pat = this.fidget ? smoothstep(0, 0.35, this.fidget.t) * smoothstep(0, 0.35, this.fidget.dur - this.fidget.t) : 0
+
+    const breath = Math.sin(this.idleTime * ANIM.idle.breathFrequency * TAU)
+    const lean = clamp(input.speed / R.leanSpeed, 0, 1) * R.lean
+    const sway = clamp(fore * R.pitch - Math.min(up, 0) * R.slump, -R.maxPitch, R.maxPitch) // the springs' share of the pitch
+    // Hands pump forward with the gallop's reach, the head nods against it.
+    const pump = Math.sin(c + 0.6) * gallop
+    const kick = m.drive * (1 - m.air) * (0.5 + 0.5 * Math.sin(this.idleTime * R.kick.rate * TAU))
+    const pitch = lean + sway + gallop * G.lean + m.air * J.lean - brake * P.lean + pat * 0.35 + breath * R.breath
+
+    out.applyDefinition(R.pose)
+    out.add('Spine1', pitch * 0.65, this.look * 0.25 - m.bend * R.turn.look * 0.3, side * R.roll + m.bend * R.turn.lean)
+    out.add('Spine2', pitch * 0.35, this.look * 0.15, side * R.roll * 0.4)
+    // The head stays up, looking where the horse goes.
+    out.add('Neck1', -pitch * 0.7 - pump * G.nod + pat * 0.2, this.look * 0.6 - m.bend * R.turn.look, -side * R.roll * 0.5)
+    for (const s of [1, -1]) {
+      const L1 = s > 0 ? 'LegL1' : 'LegR1'
+      const L2 = s > 0 ? 'LegL2' : 'LegR2'
+      const A1 = s > 0 ? 'ArmL1' : 'ArmR1'
+      const A2 = s > 0 ? 'ArmL2' : 'ArmR2'
+      // Rising out of the saddle bends the knees under the rider; the heels kick on a push-off and
+      // brace forward pulling up; the shins swing with the weight.
+      const crouch = gallop * G.knee + m.air * J.knee
+      out.add(L1, -crouch * 0.5 - brake * P.brace * 0.4)
+      const knee = crouch + kick * R.kick.amount - brake * P.brace - fore * R.swing + up * R.dangle + s * side * R.swing * 0.5
+      const rest = R.pose[L2].x
+      out.add(L2, clamp(rest + knee, R.knee[0], R.knee[1]) - rest) // never past straight
+      // Reins: back against the pitch (the hands stay by the neck), pumping at the gallop, given
+      // forward over a jump, pulled to the chest on a halt; the right hand pats the neck standing.
+      const patting = s < 0 ? pat : 0
+      out.add(A1, -sway * 0.5 - pump * G.pump - m.air * J.reach + brake * P.arm + patting * 0.45, 0, s * patting * -0.25)
+      out.add(A2, pump * G.pump * 0.6 - m.air * J.reach * 0.6 + brake * P.elbow - patting * (0.6 - 0.25 * Math.sin(this.idleTime * 11)))
+    }
+    // The seat: on the up spring, posting at the trot, a two-point seat at the gallop, standing in
+    // the stirrups over a jump.
+    out.bobY = clamp(up, -R.sink, R.lift) + m.trot * (1 - m.air) * R.post * Math.max(0, Math.sin(c * 2)) + gallop * G.lift * (0.6 + 0.4 * Math.sin(c + 0.6)) + m.air * J.lift
   }
 
   // One cycle at two depths (walk -> run), derived from actual speed.
