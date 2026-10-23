@@ -22,7 +22,7 @@ const IDS = Object.keys(WORLDS.list)
 const OK = '#7dff6a'
 const MISSING = '#ff6b6b'
 
-// deps: { hud (root), plaza (setPortal), env (show), world (setSeaColor), lighting (setMoods),
+// deps: { hud (root), plaza (setPortal), env (show), world (setGroundColor), lighting (setMoods),
 //   stats() -> { rebirths, power }, leave() (end a race / the Trails scene first), respawn() }
 export function createWorlds(deps) {
   const { hud, plaza, env, world, lighting } = deps
@@ -74,7 +74,7 @@ export function createWorlds(deps) {
     worldState.current = id
     const def = WORLDS.list[id]
     env.show(id)
-    world.setSeaColor(def.sea)
+    world.setGroundColor(def.ground)
     lighting.setMoods(def.sky)
     refreshSign()
   }

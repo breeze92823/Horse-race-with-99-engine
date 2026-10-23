@@ -247,6 +247,13 @@ export function createHorse({ lite = false, engines: withEngines = true } = {}) 
   }
   if (withEngines) setEngines(null, 2)
 
+  // Dust kicked up behind the hooves (not on lite horses): faded in with speed, only on the ground.
+  const dust = lite ? null : createEmitter(frame, {
+    boxes: LEGS.map(({ hip: [x, , z] }) => ({ x, y: 0.12, z: z - 0.1, sx: 0.22, sy: 0.06, sz: 0.3 })),
+    count: 64, life: 0.9, velocity: [0, 1.2, -5], spread: [1.2, 0.8, 1.5], gravity: 1.5,
+    size: 0.8, grow: 2.6, color: HORSE.dust.color, opacity: HORSE.dust.opacity, solid: true, seed: 77,
+  })
+
   // The avatar sits in the saddle; the equipped partner (companions.js) stands on the rump behind it.
   const rider = new Group()
   rider.position.set(0, HORSE.riderY - BODY_PIVOT[1], D.saddleZ + HORSE.riderZ)
@@ -271,6 +278,7 @@ export function createHorse({ lite = false, engines: withEngines = true } = {}) 
     setEngines,
     // Frees this horse's geometry, materials and engines (a display horse or picture done with).
     dispose() {
+      if (dust) removeEmitter(dust)
       for (const e of engines) disposeGroup(e.group)
       if (baked) disposeGroup(baked)
       for (const m of jets ?? []) {
@@ -341,6 +349,13 @@ export function createHorse({ lite = false, engines: withEngines = true } = {}) 
       // Tail: streams out behind at speed, swishes at rest.
       tail.pivot.rotation.x = Math.min(1.3, moving * (wt * 0.35 + wg * 0.85) + boost * 1.5 + air * 0.3)
       tail.pivot.rotation.z = (0.22 * still + 0.06) * Math.sin(elapsed * 1.7 + Math.sin(elapsed * 0.37) * 2) - turn * 0.2
+
+      if (dust) {
+        const kick = smooth(HORSE.dust.from, HORSE.dust.full, speed) * (1 - air)
+        dust.visible = kick > 0.01
+        dust.material.uniforms.uOpacity.value = HORSE.dust.opacity * kick
+        dust.material.uniforms.uVelocity.value[2] = -(3 + Math.min(speed, 40) * 0.45) // streams back faster at speed
+      }
 
       const thrust = (0.75 + Math.min(1, speed / 14) * 0.9) * (1 + boost * 4)
       for (let i = 0; i < flames.length; i++) {

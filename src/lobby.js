@@ -8,9 +8,7 @@ import {
   DoubleSide,
   ExtrudeGeometry,
   Group,
-  InstancedMesh,
   LatheGeometry,
-  Matrix4,
   MeshBasicMaterial,
   PlaneGeometry,
   RepeatWrapping,
@@ -22,7 +20,8 @@ import {
   TorusGeometry,
   Vector2,
 } from 'three'
-import { LOBBY, SPAWN, WATER } from './config.js'
+import { LOBBY, SPAWN } from './config.js'
+import { buildTrack } from './track.js'
 import { makeEngine } from './horse.js'
 import { paintChecker, paintChevrons, paintFade, paintSoftDot } from './textures.js'
 import { fontReady, glow, label, neon, put, solidBox, solidPole, std } from './propkit.js'
@@ -134,27 +133,10 @@ function buildGate(root, animated) {
     arrows.forEach((a, i) => (a.position.y = G.arrowY + Math.sin(t * 3.2 + i * 0.6) * 0.8))
   })
 
-  // Buoy ropes out to sea from each post (hidden while racing: race.js draws a longer, scrolling lane).
-  const lane = new Group()
+  // The dirt track and rail fences out from the posts (hidden while racing: race.js draws a longer,
+  // scrolling one).
+  const lane = buildTrack(LOBBY.lane.length)
   gate.add(lane)
-  const L = LOBBY.lane
-  const count = Math.floor(L.length / L.buoySpacing)
-  const buoys = new InstancedMesh(new SphereGeometry(0.55, 14, 10), std('#ffffff', { roughness: 0.35 }), count * 2)
-  const m = new Matrix4()
-  const red = new Color(C.buoyA)
-  const yellow = new Color(C.buoyB)
-  let n = 0
-  for (const side of [-1, 1]) {
-    for (let i = 0; i < count; i++) {
-      m.makeScale(1, 0.8, 1).setPosition(side * hw, WATER.level + 0.18, -G.padDepth / 2 - 2 - i * L.buoySpacing)
-      buoys.setMatrixAt(n, m)
-      buoys.setColorAt(n++, i % 2 ? yellow : red)
-    }
-    const rope = put(lane, new CylinderGeometry(0.06, 0.06, L.length, 6), std('#f5f5f5'), side * hw, WATER.level + 0.25, -G.padDepth / 2 - 2 - L.length / 2, false)
-    rope.rotation.x = Math.PI / 2
-  }
-  buoys.castShadow = true
-  lane.add(buoys)
   return lane
 }
 

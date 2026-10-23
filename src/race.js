@@ -1,5 +1,5 @@
-import { CanvasTexture, Color, CylinderGeometry, DoubleSide, Group, InstancedMesh, Matrix4, Mesh, MeshBasicMaterial, PlaneGeometry, RepeatWrapping, SphereGeometry, SRGBColorSpace, Vector3 } from 'three'
-import { BEACH, CAMERA, clamp, FOG, HUD, LOBBY, RACE, WATER } from './config.js'
+import { CanvasTexture, DoubleSide, Mesh, MeshBasicMaterial, PlaneGeometry, Vector3 } from 'three'
+import { BEACH, CAMERA, clamp, FOG, GROUND, HUD, LOBBY, RACE, TRACK } from './config.js'
 import { remoteRacers, sendRace } from './net.js'
 import { inputState, isLocked } from './input.js'
 import { getCameraSensitivity } from './camera.js'
@@ -7,26 +7,25 @@ import { isFirstPerson, onModeChanged, setMode } from './modes.js'
 import { player, respawn } from './player.js'
 import { closeTopWindow } from './uiWindow.js'
 import { boosts } from './boosts.js'
-import { put, std } from './propkit.js'
+import { buildTrack } from './track.js'
 import { createRaceHud } from './raceHud.js'
 import { createRaceScenery } from './raceScenery.js'
 import { engineBlip, engineRev, sfx } from './audio/index.js'
 import { setRacing } from './juice.js'
 
-// The race: driving through the START gate hands the boat to this module. It
-// drives itself down the buoy lane (-Z), speeding up to its top speed
+// The race: riding through the START gate hands the horse to this module. It
+// gallops itself down the dirt track (-Z), speeding up to its top speed
 // ((RACE.baseSpeed + RACE.speedPerBolt * the HUD's lightning) x the Acc boost), A/D or the
-// joystick steer inside the ropes, and every checkpoint wall across the lane
+// joystick steer between the rail fences, and every checkpoint wall across the track
 // it passes pays Wins (the HUD's trophies; raceHud plays the trophy/confetti
 // reward). It ends at the finish line (RACE.finish studs) or on Leave, shows the result and puts
 // the player back at the spawn.
-// The sea is only WATER.size wide, so past RACE.cruiseZ the boat stops moving
-// and the world slides past instead: the lane group (period: two buoys, so the
-// red/yellow pattern never jumps), the sea's ripples (world.setScroll) and the
-// trail (update()'s return value is the scroll speed for trail.update).
+// The meadow is only GROUND.size wide, so past RACE.cruiseZ the horse stops moving
+// and the world slides past instead: the track (by the scroll modulo TRACK.tile, so the dirt and
+// the fence posts never jump), the meadow's grass (world.setScroll), the scenery (raceScenery.js)
+// and the trail (update()'s return value is the scroll speed for trail.update).
 const G = LOBBY.gate
-const L = RACE.lane
-const SHORE_Y = WATER.level + 0.28 // feet height once the boat is out on the water
+const TRACK_Y = GROUND.level // feet height once the horse is off the start island, on the track
 const COMPACT_CAM = { ...RACE.camera, ...RACE.camera.compact }
 const ORBIT = RACE.camera.orbit
 
@@ -36,7 +35,7 @@ const stepFor = (top) => CP.steps.reduce((a, b) => (Math.abs(Math.log(b / (top *
 
 const screenPos = new Vector3()
 
-// A checkpoint wall: pale, brighter at the water, soft at the sides and top.
+// A checkpoint wall: pale, brighter at the ground, soft at the sides and top.
 function wallTexture() {
   const c = document.createElement('canvas')
   c.width = 64
@@ -65,76 +64,24 @@ function buildWalls(scene) {
   const mat = new MeshBasicMaterial({ map: wallTexture(), color: CP.color, transparent: true, opacity: CP.opacity, depthWrite: false, side: DoubleSide })
   return Array.from({ length: CP.ahead }, () => {
     const wall = new Mesh(geo, mat)
-    wall.position.y = WATER.level
+    wall.position.y = GROUND.level
     wall.visible = false
-    wall.renderOrder = 4 // after the trail and the sea
+    wall.renderOrder = 4 // after the trail
     scene.add(wall)
     return wall
   })
 }
 
-// Orange/white candy-cane rope, stripes painted diagonally so they wrap as a helix.
-function ropeTexture() {
-  const c = document.createElement('canvas')
-  c.width = c.height = 64
-  const ctx = c.getContext('2d')
-  ctx.fillStyle = '#ffffff'
-  ctx.fillRect(0, 0, 64, 64)
-  ctx.fillStyle = '#ff5a1a'
-  for (const o of [-64, 0, 64]) {
-    ctx.beginPath()
-    ctx.moveTo(o, 0)
-    ctx.lineTo(o + 32, 0)
-    ctx.lineTo(o + 96, 64)
-    ctx.lineTo(o + 64, 64)
-    ctx.closePath()
-    ctx.fill()
-  }
-  const tex = new CanvasTexture(c)
-  tex.colorSpace = SRGBColorSpace
-  tex.wrapS = tex.wrapT = RepeatWrapping
-  tex.repeat.set(1, L.length / (2 * L.stripe))
-  return tex
-}
-
-// The race lane: the lobby's buoy pattern, much longer, on striped ropes.
-function buildLane(scene) {
-  const hw = G.halfWidth
-  const lane = new Group()
-  lane.position.z = G.z
-  lane.visible = false
-  scene.add(lane)
-  const count = Math.floor(L.length / L.buoySpacing / 2) * 2 // even: the pattern repeats every two buoys
-  const buoys = new InstancedMesh(new SphereGeometry(0.55, 14, 10), std('#ffffff', { roughness: 0.35 }), count * 2)
-  const m = new Matrix4()
-  const red = new Color(LOBBY.colors.buoyA)
-  const yellow = new Color(LOBBY.colors.buoyB)
-  const start = -G.padDepth / 2 - 2
-  let n = 0
-  const rope = new CylinderGeometry(0.11, 0.11, L.length, 8)
-  const ropeMat = std('#ffffff', { map: ropeTexture(), roughness: 0.5 })
-  for (const side of [-1, 1]) {
-    for (let i = 0; i < count; i++) {
-      m.makeScale(1, 0.8, 1).setPosition(side * hw, WATER.level + 0.18, start - i * L.buoySpacing)
-      buoys.setMatrixAt(n, m)
-      buoys.setColorAt(n++, i % 2 ? yellow : red)
-    }
-    put(lane, rope, ropeMat, side * hw, WATER.level + 0.25, start - L.length / 2, false).rotation.x = Math.PI / 2
-  }
-  buoys.castShadow = true
-  buoys.frustumCulled = false // one long instanced mesh; its bounds would be the first buoy's
-  lane.add(buoys)
-  return lane
-}
-
-
 // hud: the main HUD (stats, setDistance / setRacers, timer); the race widgets are added to it.
 // lobby: setLaneVisible. world: setScroll. home: the start island's scene objects (slid away while
 // racing). onEnd(): after the player is back at the spawn.
 export function createRace({ scene, hud, lobby, world, home, onEnd }) {
-  const lane = buildLane(scene)
+  const lane = buildTrack(RACE.lane.length)
+  lane.position.z = G.z
+  lane.visible = false
+  scene.add(lane)
   const walls = buildWalls(scene)
-  const scenery = createRaceScenery(scene, home) // islands, ships, arches... streaming past the lane
+  const scenery = createRaceScenery(scene, home) // farms, windmills, arches... streaming past the track
   // next: index of the next checkpoint; sx, sy: the boat on screen (px), where the reward trophies start.
   // boost: boosts() when the race started; lastTop: the previous race's top speed (for the speed-up banner);
   // step / early: this race's checkpoint spacing and the early checkpoints below it; best: the personal best
@@ -291,15 +238,15 @@ export function createRace({ scene, hud, lobby, world, home, onEnd }) {
         s.z = RACE.cruiseZ
       }
       s.x = clamp(s.x + inputState.move.x * RACE.steerSpeed * dt, -halfLane, halfLane)
-      // Off the pad and onto the water.
-      const yTarget = s.z < BEACH.front ? SHORE_Y : 0
+      // Off the pad and onto the track.
+      const yTarget = s.z < BEACH.front ? TRACK_Y : 0
       s.y += (yTarget - s.y) * (1 - Math.exp(-6 * dt))
       player.position.x = player.renderPosition.x = s.x
       player.position.y = player.renderPosition.y = s.y
       player.position.z = player.renderPosition.z = s.z
       player.facing = Math.PI
 
-      lane.position.z = G.z + (s.scroll % (2 * L.buoySpacing))
+      lane.position.z = G.z + (s.scroll % TRACK.tile)
       world.setScroll(s.scroll)
       scenery.update(dt, s.scroll, s.z)
 
@@ -322,7 +269,7 @@ export function createRace({ scene, hud, lobby, world, home, onEnd }) {
         const k = s.next - 1 + i
         const ahead = k < 0 ? -Infinity : (checkpointAt(k) - s.studs) * RACE.metresPerStud
         w.visible = ahead > -RACE.camera.distance - 4 && ahead < FOG.far
-        w.position.set(0, WATER.level, s.z - ahead)
+        w.position.set(0, GROUND.level, s.z - ahead)
       })
 
       ui.setInfo({ ms: s.t * 1000, speed, top: s.top, studs: s.studs, boost: s.boostTap })

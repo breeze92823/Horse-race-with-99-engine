@@ -1,23 +1,22 @@
-import { Box3, BoxGeometry, Color, ConeGeometry, CylinderGeometry, DodecahedronGeometry, Euler, Float32BufferAttribute, Group, Matrix4, Mesh, Quaternion, SphereGeometry, TorusGeometry, Vector3 } from 'three'
+import { BoxGeometry, CanvasTexture, Color, ConeGeometry, CylinderGeometry, DodecahedronGeometry, DoubleSide, Euler, Float32BufferAttribute, Group, IcosahedronGeometry, Matrix4, Mesh, PlaneGeometry, Quaternion, SphereGeometry, SRGBColorSpace, TorusGeometry, Vector3 } from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
-import { LOBBY, PLAZA, RACE, WATER } from './config.js'
-import { buildCliff, buildPalm, glow, neon, std } from './propkit.js'
-import { makeHill } from './world.js'
-import { buildBoat } from './boatModels.js'
-import { mulberry32 } from './textures.js'
+import { GROUND, LOBBY, PLAZA, RACE, WATER } from './config.js'
+import { fontReady, std } from './propkit.js'
+import { mulberry32, paintText } from './textures.js'
 import { bake } from './bake.js'
 
-// What the player races past. The sea is only WATER.size wide and a race
-// scrolls the world past a boat parked at RACE.cruiseZ (race.js), so the
+// What the player races past. The meadow is only GROUND.size wide and a race
+// scrolls the world past a horse held at RACE.cruiseZ (race.js), so the
 // scenery lives in "track" z (where it would be with no scroll) and is drawn at
-// track z + scroll. Set pieces (palm islands, sea stacks, anchored ships, a
-// lighthouse, hot-air balloons, a giant rubber duck, leaping dolphins) are
-// built once, merged down to a few draw calls each (bake) and recycled: one
-// is placed every RACE.scenery.gap m alternating sides, appears inside the fog
-// ahead and goes back to its pool once well behind the boat. A rock or rainbow
-// arch spans the lane every archEvery m. The start island (`home`: the beach,
-// lobby, plaza, shops) slides away with the same scroll and is hidden once it
-// has gone into the fog, so it never trails the boat.
+// track z + scroll. Countryside set pieces (farms with barns and silos,
+// windmills, oak groves, hay bales, grandstands full of cheering spectators,
+// grazing sheep and cows, hot-air balloons) are built once, merged down to a
+// few draw calls each (bake) and recycled: one is placed every
+// RACE.scenery.gap m, mostly alternating sides, appears inside the fog ahead
+// and goes back to its pool once well behind the horse. A rock, rainbow or
+// ranch-gate arch spans the track every archEvery m. The start island (`home`:
+// the beach, lobby, plaza, shops) slides away with the same scroll and is
+// hidden once it has gone into the fog, so it never trails the horse.
 const S = RACE.scenery
 const HALF = LOBBY.gate.halfWidth
 
@@ -56,124 +55,234 @@ function rod(a, b, r) {
 }
 
 // --- Set pieces ------------------------------------------------------------------------------
-// Each returns { root, update?(t) }; roots are built at the origin, facing -Z.
-const SEA = WATER.level - 1 // makeHill / cliff foot height
+// Each returns { root, update?(t) }; roots are built at the origin, standing on the meadow
+// (GROUND.level), facing -Z (a grandstand faces +Z: it is turned toward the track).
+const FOOT = GROUND.level // where everything stands
+const ROCK_FOOT = WATER.level - 1 // cliff / arch rock feet, sunk below the meadow
 
-// Palm island: a grassy mound in a sand rim, palms; variant 1 has a hut, 2 shore rocks.
-function island(variant, seed) {
+// A box / sphere / cylinder in one flat colour, as a non-indexed geometry with a vertex colour (for
+// pieces merged into one vertex-coloured mesh: the crowd, the herds).
+function tinted(geo, color, x, y, z, rx = 0, ry = 0, rz = 0, sx = 1, sy = 1, sz = 1) {
+  const g = part(geo, x, y, z, rx, ry, rz, sx, sy, sz)
+  const c = new Color(color)
+  return paintFaces(g, (px, py, pz, out) => out.copy(c))
+}
+const put = (g, geo, mat, x, y, z, rx = 0, ry = 0, rz = 0) => {
+  const m = new Mesh(geo, mat)
+  m.position.set(x, y, z)
+  m.rotation.set(rx, ry, rz)
+  g.add(m)
+  return m
+}
+
+// A round cartoon oak: a trunk and a cluster of leafy balls.
+const LEAVES = ['#3f9e32', '#4fb33c', '#5cbf45', '#378a2c']
+function oak(g, x, z, h, rand, y = FOOT) {
+  const trunk = std('#7a4f2a', { roughness: 1 })
+  put(g, new CylinderGeometry(0.35 * h / 6, 0.55 * h / 6, h * 0.6, 7), trunk, x, y + h * 0.3, z)
+  const r = h * 0.38
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * Math.PI * 2 + rand() * 1.2
+    const d = i === 0 ? 0 : r * 0.55
+    const ball = put(g, new IcosahedronGeometry(r * (i === 0 ? 1 : 0.75), 1), std(LEAVES[Math.floor(rand() * LEAVES.length)], { roughness: 1, flatShading: true }), x + Math.cos(a) * d, y + h * 0.72 + (i === 0 ? r * 0.3 : 0), z + Math.sin(a) * d)
+    ball.rotation.set(rand() * 3, rand() * 3, 0)
+  }
+}
+
+// A gable roof over a w x d box whose walls end at `top`, ridge along its depth (turned by `yaw`):
+// two slate slabs over a gable prism (a 3-sided cylinder lying down) in the wall colour.
+function gable(g, w, d, top, wall, roof, x = 0, z = 0, yaw = 0) {
+  const h = new Group()
+  h.position.set(x, 0, z)
+  h.rotation.y = yaw
+  g.add(h)
+  const rise = w * 0.32
+  const r = w / Math.sqrt(3) // the prism's triangle spans the wall's width
+  const sy = (2 * rise) / (3 * r) // squashed to `rise` tall
+  const prism = new CylinderGeometry(r, r, d, 3)
+  prism.rotateX(Math.PI / 2)
+  prism.rotateZ(Math.PI) // a corner up
+  put(h, prism, wall, 0, top + (r / 2) * sy, 0).scale.y = sy
+  const slope = Math.hypot(w / 2, rise)
+  const a = Math.atan2(rise, w / 2)
+  for (const s of [-1, 1]) put(h, new BoxGeometry(slope + 0.6, 0.35, d + 1), roof, s * (w / 4), top + rise / 2 + 0.2, 0, 0, 0, -s * a)
+}
+
+// A white post-and-rail fence along a line (farm paddocks).
+function fenceLine(g, ax, az, bx, bz, white) {
+  const len = Math.hypot(bx - ax, bz - az)
+  const yaw = Math.atan2(bx - ax, bz - az)
+  const n = Math.max(1, Math.round(len / 3))
+  for (let i = 0; i <= n; i++) put(g, new BoxGeometry(0.2, 1.3, 0.2), white, ax + ((bx - ax) * i) / n, FOOT + 0.65, az + ((bz - az) * i) / n)
+  for (const y of [0.6, 1.1]) put(g, new BoxGeometry(0.1, 0.14, len), white, (ax + bx) / 2, FOOT + y, (az + bz) / 2, 0, yaw, 0)
+}
+
+// Farm: a red barn with white trim and a big X door, a silo, a paddock; variant 1 adds a farmhouse.
+function farm(variant, seed) {
   const rand = mulberry32(seed)
-  const [rx, ry, rz] = [[26, 6, 18], [34, 8, 22], [20, 5, 15]][variant]
   const g = new Group()
-  g.add(...makeHill(0, 0, rx, ry, rz, ['#4dbb3c', '#45ad37', '#58c445'][variant], seed))
-  const surface = (x, z) => SEA + ry * Math.sqrt(Math.max(0, 1 - (x / rx) ** 2 - (z / rz) ** 2)) - 0.3
-  const palms = [3, 4, 2][variant]
-  for (let i = 0; i < palms; i++) {
-    const a = (i / palms) * Math.PI * 2 + rand()
-    const x = Math.cos(a) * rx * (0.15 + rand() * 0.3)
-    const z = Math.sin(a) * rz * (0.15 + rand() * 0.3)
-    buildPalm(g, x, z, 9 + rand() * 6, (rand() - 0.5) * 0.6, (rand() - 0.5) * 0.6, seed * 10 + i, surface(x, z))
-  }
+  const red = std(S.barns[variant % S.barns.length], { roughness: 0.85 })
+  const white = std('#f6f3ea', { roughness: 0.6 })
+  const slate = std('#4f5560', { roughness: 0.7 })
+  put(g, new BoxGeometry(12, 7, 16), red, 0, FOOT + 3.5, 0)
+  gable(g, 12, 16, FOOT + 7, red, slate)
+  // Front: white corner trim, a big door with an X brace, a loft door.
+  for (const sx of [-1, 1]) put(g, new BoxGeometry(0.4, 7, 0.4), white, sx * 6, FOOT + 3.5, -8)
+  put(g, new BoxGeometry(5, 5.4, 0.2), std('#8e2a22', { roughness: 0.9 }), 0, FOOT + 2.7, -8.05)
+  for (const s of [-1, 1]) put(g, new BoxGeometry(0.35, 7, 0.25), white, 0, FOOT + 2.7, -8.2, 0, 0, s * 0.75)
+  put(g, new BoxGeometry(5.3, 0.35, 0.25), white, 0, FOOT + 5.45, -8.2)
+  put(g, new BoxGeometry(2.4, 2, 0.2), white, 0, FOOT + 8.6, -8.05)
+  // Silo: banded tower with a dome.
+  const steel = std('#c9ccd2', { roughness: 0.45, metalness: 0.3 })
+  put(g, new CylinderGeometry(2.6, 2.6, 14, 16), steel, 9.2, FOOT + 7, 2)
+  for (let i = 1; i < 5; i++) put(g, new CylinderGeometry(2.68, 2.68, 0.25, 16), slate, 9.2, FOOT + i * 2.8, 2)
+  put(g, new SphereGeometry(2.6, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), slate, 9.2, FOOT + 14, 2)
+  // Paddock in front.
+  fenceLine(g, -9, -11, 9, -11, white)
+  fenceLine(g, -9, -11, -9, -24, white)
+  fenceLine(g, 9, -11, 9, -24, white)
+  fenceLine(g, -9, -24, 9, -24, white)
   if (variant === 1) {
-    const y = surface(rx * 0.35, -rz * 0.2)
-    const hut = new Mesh(new BoxGeometry(5, 3.4, 4.2), std('#c98a4a', { roughness: 0.9 }))
-    hut.position.set(rx * 0.35, y + 1.6, -rz * 0.2)
-    const roof = new Mesh(new ConeGeometry(4.3, 3.2, 4), std('#e8c25a', { roughness: 1 }))
-    roof.position.set(rx * 0.35, y + 4.9, -rz * 0.2)
-    roof.rotation.y = Math.PI / 4
-    g.add(hut, roof)
+    put(g, new BoxGeometry(9, 5, 7), white, -16, FOOT + 2.5, 3)
+    gable(g, 7, 9, FOOT + 5, white, std('#b8342a', { roughness: 0.8 }), -16, 3, Math.PI / 2)
+    put(g, new BoxGeometry(1.4, 2.4, 0.2), std('#3a6ad8'), -16, FOOT + 1.2, -0.55)
   }
-  if (variant === 2) {
-    const rockMat = std(PLAZA.rock, { flatShading: true, roughness: 0.95 })
-    for (let i = 0; i < 4; i++) {
-      const a = rand() * Math.PI * 2
-      const r = new Mesh(new DodecahedronGeometry(1.6 + rand() * 1.6), rockMat)
-      r.position.set(Math.cos(a) * rx * 1.05, WATER.level, Math.sin(a) * rz * 1.05)
-      r.rotation.set(rand() * 3, rand() * 3, 0)
-      g.add(r)
+  for (let i = 0; i < 3; i++) oak(g, -14 + rand() * 4 + i * 11, 12 + rand() * 6, 8 + rand() * 4, rand)
+  return { root: bake(g) }
+}
+
+// Windmill: a white tower with a red cap and four lattice sails, turning.
+function windmill(seed) {
+  const g = new Group()
+  put(g, new CylinderGeometry(2.4, 3.8, 14, 8), std('#efe6d6', { roughness: 0.9 }), 0, FOOT + 7, 0)
+  put(g, new ConeGeometry(3.3, 4, 8), std('#b8342a', { roughness: 0.8 }), 0, FOOT + 16, 0)
+  put(g, new BoxGeometry(1.8, 3, 0.3), std('#6b4428'), 0, FOOT + 1.5, -3.5, -0.12)
+  for (const y of [6, 10]) put(g, new BoxGeometry(1.2, 1.2, 0.3), std('#3a6ad8'), 0, FOOT + y, -3.0 + (y - 6) * 0.15, -0.12)
+  const root = new Group()
+  root.add(bake(g, true))
+  const sails = new Group()
+  sails.position.set(0, FOOT + 14.5, -3.3)
+  const frame = std('#6b4428', { roughness: 0.9 })
+  const cloth = std('#fbf6ea', { roughness: 0.9, side: DoubleSide })
+  const blades = new Group()
+  put(blades, new CylinderGeometry(0.6, 0.6, 1, 10), frame, 0, 0, 0, Math.PI / 2)
+  for (let i = 0; i < 4; i++) {
+    const arm = new Group()
+    arm.rotation.z = (i / 4) * Math.PI * 2
+    put(arm, new BoxGeometry(0.4, 10, 0.3), frame, 0, 5, 0)
+    put(arm, new BoxGeometry(2.2, 8, 0.1), cloth, 1.2, 5.6, 0.1)
+    blades.add(arm)
+  }
+  sails.add(bake(blades, true))
+  root.add(sails)
+  const phase = seed
+  return { root, update: (t) => (sails.rotation.z = t * 0.9 + phase) }
+}
+
+// A grove of round oaks and bushes (variants: a few big trees, a wide copse).
+function grove(variant, seed) {
+  const rand = mulberry32(seed)
+  const g = new Group()
+  const n = variant === 0 ? 3 : 7
+  const spread = variant === 0 ? 8 : 18
+  for (let i = 0; i < n; i++) oak(g, (rand() - 0.5) * spread * 2, (rand() - 0.5) * spread, 9 + rand() * 6, rand)
+  const bush = std('#3f9e32', { roughness: 1, flatShading: true })
+  for (let i = 0; i < n + 2; i++) put(g, new IcosahedronGeometry(1.4 + rand() * 1.2, 1), bush, (rand() - 0.5) * spread * 2.2, FOOT + 0.6, (rand() - 0.5) * spread * 1.2).scale.y = 0.7
+  return { root: bake(g, true) }
+}
+
+// Hay: round bales lying in the grass and a stack of square ones.
+function hay(seed) {
+  const rand = mulberry32(seed)
+  const g = new Group()
+  const straw = std('#e8c25a', { roughness: 1 })
+  const end = std('#d6a83e', { roughness: 1 })
+  for (let i = 0; i < 4; i++) {
+    const x = -8 + i * 4.2 + rand()
+    const z = (rand() - 0.5) * 6
+    const yaw = rand() * Math.PI
+    const bale = new Group()
+    put(bale, new CylinderGeometry(1.3, 1.3, 1.6, 16), straw, 0, 0, 0, 0, 0, Math.PI / 2)
+    for (const s of [-1, 1]) put(bale, new CylinderGeometry(1.0, 1.0, 0.04, 16), end, s * 0.82, 0, 0, 0, 0, Math.PI / 2)
+    bale.position.set(x, FOOT + 1.3, z)
+    bale.rotation.y = yaw
+    g.add(bale)
+  }
+  // Square bales: three, two, one.
+  const block = new BoxGeometry(2.2, 1, 1.2)
+  for (let row = 0; row < 3; row++)
+    for (let i = 0; i < 3 - row; i++) put(g, block, straw, 10 + (i - (2 - row) / 2) * 2.3, FOOT + 0.5 + row, 2)
+  return { root: bake(g, true) }
+}
+
+// Grandstand facing +Z: concrete tiers full of spectators (cheering: they bounce), a roof on
+// posts with pennants.
+function grandstand(seed) {
+  const rand = mulberry32(seed)
+  const g = new Group()
+  const L = 26
+  const tiers = 5
+  const concrete = std('#d8dde6', { roughness: 0.9 })
+  for (let i = 0; i < tiers; i++) put(g, new BoxGeometry(L, 0.9 * (i + 1), 1.5), concrete, 0, FOOT + 0.45 * (i + 1), -i * 1.5)
+  const blue = std('#2f6bdc', { roughness: 0.6 })
+  for (const sx of [-1, 1]) for (const z of [1, -7]) put(g, new CylinderGeometry(0.2, 0.2, 9.5, 8), std('#e8eef8'), sx * (L / 2 - 0.4), FOOT + 4.75, z)
+  put(g, new BoxGeometry(L + 1, 0.3, 9.4), blue, 0, FOOT + 9.6, -3, 0.08)
+  const pennant = new ConeGeometry(0.6, 1.6, 3)
+  for (let i = 0; i < 9; i++) put(g, pennant, std(S.crowd[i % S.crowd.length]), -L / 2 + 1.5 + i * ((L - 3) / 8), FOOT + 10.6, -7.5, 0, 0, Math.PI / 2)
+  const root = new Group()
+  root.add(bake(g, true))
+  // The crowd: one vertex-coloured mesh, a body and a head per seat (some seats empty).
+  const people = []
+  const skins = ['#f2c79a', '#d9a066', '#a8683c', '#7a4a26', '#ffe0bd']
+  const bodyGeo = new BoxGeometry(0.6, 0.9, 0.45)
+  const headGeo = new BoxGeometry(0.45, 0.45, 0.45)
+  for (let i = 0; i < tiers; i++)
+    for (let x = -L / 2 + 0.8; x < L / 2 - 0.6; x += 0.85) {
+      if (rand() < 0.2) continue
+      const y = FOOT + 0.9 * (i + 1)
+      const z = -i * 1.5
+      people.push(tinted(bodyGeo, S.crowd[Math.floor(rand() * S.crowd.length)], x, y + 0.45, z))
+      people.push(tinted(headGeo, skins[Math.floor(rand() * skins.length)], x, y + 1.15, z))
+    }
+  const crowd = new Mesh(mergeGeometries(people), vc({ roughness: 0.8 }))
+  for (const p of people) p.dispose()
+  root.add(crowd)
+  const phase = seed
+  return { root, update: (t) => (crowd.position.y = Math.abs(Math.sin(t * 5 + phase)) * 0.18) }
+}
+
+// A herd grazing in the meadow: sheep (variant 0) or black-and-white cows (variant 1).
+function herd(variant, seed) {
+  const rand = mulberry32(seed)
+  const pieces = []
+  const box = (w, h, d) => new BoxGeometry(w, h, d)
+  const n = variant === 0 ? 8 : 5
+  for (let i = 0; i < n; i++) {
+    const x = (rand() - 0.5) * 22
+    const z = (rand() - 0.5) * 14
+    const yaw = rand() * Math.PI * 2
+    const k = variant === 0 ? 1 : 1.5
+    const at = (lx, ly, lz) => [x + Math.cos(yaw) * lx + Math.sin(yaw) * lz, FOOT + ly, z - Math.sin(yaw) * lx + Math.cos(yaw) * lz]
+    const add = (geo, color, lx, ly, lz) => pieces.push(tinted(geo, color, ...at(lx * k, ly * k, lz * k), 0, yaw, 0, k, k, k))
+    const legs = variant === 0 ? '#2a2a2e' : '#f4f4f4'
+    for (const [lx, lz] of [[-0.35, 0.55], [0.35, 0.55], [-0.35, -0.55], [0.35, -0.55]]) add(box(0.2, 0.6, 0.2), legs, lx, 0.3, lz)
+    if (variant === 0) {
+      add(box(1.1, 0.8, 1.6), '#f6f4ee', 0, 0.95, 0) // wool
+      add(box(0.45, 0.5, 0.5), '#2a2a2e', 0, 0.85, 0.95) // head, grazing low
+    } else {
+      add(box(1.0, 0.8, 1.7), '#f4f4f4', 0, 1.0, 0)
+      // Black patches: slabs a little wider than the body, so they show on both flanks.
+      add(box(1.04, 0.42, 0.5), '#1d1d22', 0, 1.12, 0.25)
+      add(box(1.04, 0.36, 0.42), '#1d1d22', 0, 0.94, -0.5)
+      add(box(0.5, 0.5, 0.6), '#1d1d22', 0, 0.95, 1.05)
+      add(box(0.46, 0.25, 0.2), '#f2a8b4', 0, 0.82, 1.4)
     }
   }
-  return { root: bake(g) }
-}
-
-// Sea stacks: grass-capped rock towers with palms on top (variant 0 tall, 1 a wide pair).
-function stack(variant, seed) {
-  const rand = mulberry32(seed)
-  const g = new Group()
-  const top = (h) => SEA + h + 0.6
-  if (variant === 0) {
-    buildCliff(g, [0, 0, 10, 9, 26, rand() * 3], seed, SEA, false)
-    buildPalm(g, 0.5, 0.5, 8, 0.2, -0.1, seed * 10, top(26))
-  } else {
-    buildCliff(g, [0, 0, 26, 16, 14, 0.2], seed, SEA, false)
-    buildCliff(g, [15, 9, 10, 9, 8, 0.7], seed + 1, SEA, false)
-    buildPalm(g, -6, 2, 10, -0.2, 0.1, seed * 10, top(14))
-    buildPalm(g, 5, -3, 8, 0.3, 0, seed * 10 + 1, top(14))
-  }
-  return { root: bake(g) }
-}
-
-// Lighthouse on a rock: red and white bands, glowing lamp room, two sweeping beams.
-function lighthouse(seed) {
-  const g = new Group()
-  buildCliff(g, [0, 0, 14, 12, 6, 0.4], seed, SEA, false)
-  const base = SEA + 6.6
-  const bands = 6
-  const H = 21
-  for (let i = 0; i < bands; i++) {
-    const r0 = 2.9 - (i / bands) * 1.0
-    const r1 = 2.9 - ((i + 1) / bands) * 1.0
-    const band = new Mesh(new CylinderGeometry(r1, r0, H / bands, 20), std(i % 2 ? '#e8262b' : '#f4f4f4', { roughness: 0.5 }))
-    band.position.y = base + (i + 0.5) * (H / bands)
-    g.add(band)
-  }
-  const dark = std('#2a2d33', { roughness: 0.6 })
-  const gallery = new Mesh(new CylinderGeometry(2.7, 2.7, 0.5, 20), dark)
-  gallery.position.y = base + H + 0.25
-  const lamp = new Mesh(new CylinderGeometry(1.5, 1.5, 2.4, 16), neon('#fff3b0', 2.5))
-  lamp.position.y = base + H + 1.7
-  const roof = new Mesh(new ConeGeometry(2.1, 2.4, 16), std('#e8262b', { roughness: 0.5 }))
-  roof.position.y = base + H + 4.1
-  g.add(gallery, lamp, roof)
+  const mesh = new Mesh(mergeGeometries(pieces), vc({ roughness: 0.9 }))
+  for (const p of pieces) p.dispose()
   const root = new Group()
-  root.add(bake(g))
-  // The beams: two long open cones from the lamp, turning.
-  const spin = new Group()
-  spin.position.y = base + H + 1.7
-  const beamMat = glow('#fff6c8', 0.11)
-  for (const dir of [1, -1]) {
-    const geo = new ConeGeometry(4.5, 70, 16, 1, true)
-    geo.translate(0, -35, 0) // apex at the lamp
-    geo.rotateZ(dir * (Math.PI / 2 + 0.06)) // out sideways, a little downward
-    spin.add(new Mesh(geo, beamMat))
-  }
-  root.add(spin)
-  return { root, update: (t) => (spin.rotation.y = t * 1.2) }
-}
-
-// An anchored ship (a catalog boat scaled up), rocking at anchor.
-const box = new Box3()
-function ship([spec, length], seed) {
-  const model = buildBoat(spec)
-  box.setFromObject(model)
-  const k = length / Math.max(0.01, box.max.z - box.min.z)
-  model.scale.setScalar(k)
-  const holder = new Group()
-  holder.add(model)
-  const baked = bake(holder)
-  model.traverse((o) => o.isMesh && o.geometry.dispose()) // its materials live on in the baked meshes
-  // The catalog hulls were built to float their origin ~0.4 m over the water at 3.6 m long; the same, scaled.
-  const y = WATER.level + 0.4 * (length / 3.6)
-  const root = new Group()
-  root.add(baked)
-  const phase = seed * 1.7
-  return {
-    root,
-    update(t) {
-      baked.position.y = y + Math.sin(t * 0.9 + phase) * 0.3
-      baked.rotation.z = Math.sin(t * 0.7 + phase) * 0.035
-      baked.rotation.x = Math.sin(t * 0.5 + phase) * 0.015
-    },
-  }
+  root.add(mesh)
+  return { root }
 }
 
 // Hot-air balloon: striped teardrop envelope, wicker basket on four ropes.
@@ -209,93 +318,10 @@ function balloon(colors, seed) {
   }
 }
 
-// A giant rubber duck.
-function duck(seed) {
-  const yellow = std('#ffd21a', { roughness: 0.35 })
-  const g = new Group()
-  const add = (geo, mat, x, y, z, sx = 1, sy = 1, sz = 1) => {
-    const m = new Mesh(geo, mat)
-    m.position.set(x, y, z)
-    m.scale.set(sx, sy, sz)
-    g.add(m)
-    return m
-  }
-  const ball = new SphereGeometry(1, 24, 16)
-  add(ball, yellow, 0, WATER.level + 1.2, 0, 5, 3.6, 6.5)
-  add(ball, yellow, 0, WATER.level + 6.6, -3.6, 3.2, 3.2, 3.2)
-  add(ball, std('#ff8a1a', { roughness: 0.4 }), 0, WATER.level + 6.1, -7.1, 1.7, 0.6, 1.9)
-  const black = std('#111111', { roughness: 0.2 })
-  for (const sx of [-1, 1]) add(ball, black, sx * 1.4, WATER.level + 7.6, -6.2, 0.5, 0.6, 0.4)
-  add(new ConeGeometry(2.4, 3.6, 14), yellow, 0, WATER.level + 4.2, 5.6).rotation.x = -0.7
-  const baked = bake(g)
-  const root = new Group()
-  root.add(baked)
-  const phase = seed
-  return {
-    root,
-    update(t) {
-      baked.position.y = Math.sin(t * 1.1 + phase) * 0.35
-      baked.rotation.z = Math.sin(t * 0.8 + phase) * 0.05
-    },
-  }
-}
-
-// Three dolphins leaping in turn, swimming down the lane beside it.
-let dolphinGeo = null
-function dolphinGeometry() {
-  if (dolphinGeo) return dolphinGeo
-  const s = new SphereGeometry(1, 16, 10)
-  const parts = [
-    part(s, 0, 0, 0, 0, 0, 0, 0.6, 0.6, 1.8),
-    part(new CylinderGeometry(0.13, 0.24, 0.8, 8), 0, -0.05, -2.0, Math.PI / 2),
-    part(new ConeGeometry(0.4, 0.9, 4), 0, 0.7, 0.2, -0.5, 0, 0, 1, 1, 1.5),
-    part(new BoxGeometry(1.6, 0.08, 0.55), 0, 0, 1.95),
-    part(new BoxGeometry(0.9, 0.06, 0.38), 0.6, -0.3, -0.5, 0, 0, -0.45),
-    part(new BoxGeometry(0.9, 0.06, 0.38), -0.6, -0.3, -0.5, 0, 0, 0.45),
-  ]
-  dolphinGeo = mergeGeometries(parts)
-  const top = new Color('#4f7896')
-  const belly = new Color('#dce8f0')
-  paintFaces(dolphinGeo, (x, y, z, c) => c.copy(belly).lerp(top, Math.min(1, Math.max(0, (y + 0.25) / 0.5))))
-  return dolphinGeo
-}
-function dolphins(seed) {
-  const root = new Group()
-  const mat = vc({ roughness: 0.3 })
-  const pod = [0, 1, 2].map((i) => {
-    const m = new Mesh(dolphinGeometry(), mat)
-    m.scale.setScalar(1.15)
-    root.add(m)
-    return { m, x: (i - 1) * 3.2, z: i * 5, period: 2.4 + i * 0.25, phase: i * 0.8 + seed }
-  })
-  const AIR = 0.45 // share of each cycle spent in the air
-  const H = 4.5 // m high
-  const L = 15 // m long
-  const SWIM = 9 // m/s forward, so they look like they race the boat
-  let born = 0
-  return {
-    root,
-    reset: (t) => (born = t),
-    update(t) {
-      const swim = -(t - born) * SWIM
-      for (const d of pod) {
-        const u = ((t + d.phase) % d.period) / d.period
-        if (u > AIR) {
-          d.m.visible = false
-          continue
-        }
-        const a = u / AIR
-        d.m.visible = true
-        d.m.position.set(d.x, WATER.level - 0.6 + H * Math.sin(Math.PI * a), d.z + swim - L * a)
-        d.m.rotation.x = Math.atan2(H * Math.PI * Math.cos(Math.PI * a), L) // nose follows the arc
-      }
-    },
-  }
-}
-
-// An arch over the lane: lumpy rock with palms on top, or an inflatable rainbow.
+// An arch over the track: lumpy rock with oaks on top, an inflatable rainbow, or a log ranch gate
+// with a sign.
 function arch(kind, seed) {
-  const R = HALF + 8 // feet clear of the ropes
+  const R = HALF + 8 // feet clear of the fences
   const g = new Group()
   if (kind === 'rock') {
     const rand = mulberry32(seed)
@@ -321,7 +347,27 @@ function arch(kind, seed) {
       foot.rotation.set(rand() * 3, rand() * 3, 0)
       g.add(foot)
     }
-    for (const a of [1.35, 1.75]) buildPalm(g, Math.cos(a) * R, 0, 9, Math.cos(a) * 0.5, 0.1, seed * 10 + Math.round(a * 10), Math.sin(a) * R + 3.2)
+    for (const a of [1.35, 1.75]) oak(g, Math.cos(a) * R, 0, 8, rand, Math.sin(a) * R + 2.6)
+  } else if (kind === 'ranch') {
+    // Two log posts, a log beam and a sign board, a golden horseshoe hanging under it.
+    const log = std('#8a5a2e', { roughness: 0.95 })
+    const H = 13
+    for (const sx of [-1, 1]) {
+      put(g, new CylinderGeometry(0.9, 1.1, H + 1.5, 10), log, sx * (HALF + 3), H / 2, 0)
+      put(g, new SphereGeometry(1.0, 10, 6), log, sx * (HALF + 3), H + 0.8, 0)
+    }
+    put(g, new CylinderGeometry(0.75, 0.75, 2 * HALF + 9, 10), log, 0, H - 0.6, 0, 0, 0, Math.PI / 2)
+    const sign = paintText('GIDDY UP!', { color: '#ffd21a', outline: '#3a210e', bg: '#8a5a2e', pad: 40 })
+    const tex = new CanvasTexture(sign.canvas)
+    tex.colorSpace = SRGBColorSpace
+    fontReady.then(() => {
+      sign.draw()
+      tex.needsUpdate = true
+    })
+    const w = 16
+    const board = put(g, new PlaneGeometry(w, (w * sign.canvas.height) / sign.canvas.width), std('#ffffff', { map: tex, roughness: 0.9, side: DoubleSide }), 0, H + 1.9, 0)
+    board.rotation.y = Math.PI // readable from the oncoming side (+Z)
+    put(g, new TorusGeometry(1.4, 0.32, 8, 20, Math.PI * 1.4), std('#ffcf3a', { roughness: 0.3, metalness: 0.7 }), 0, H - 2.6, 0, 0, 0, Math.PI * 1.2)
   } else {
     const palette = S.rainbow.map((c) => new Color(c))
     const T = 2.6
@@ -338,7 +384,7 @@ function arch(kind, seed) {
       g.add(pod)
     }
   }
-  g.position.y = kind === 'rock' ? SEA : WATER.level
+  g.position.y = kind === 'rock' ? ROCK_FOOT : FOOT
   const root = new Group()
   root.add(bake(g, true))
   return { root }
@@ -370,15 +416,15 @@ export function createRaceScenery(scene, home) {
     }
     let seed = 300
     built = {
-      island: [0, 1, 2, 0, 1, 2].map((v) => add(island(v, seed++))),
-      stack: [0, 1, 0, 1].map((v) => add(stack(v, seed++))),
-      ship: S.ships.map((spec) => add(ship(spec, seed++))),
-      lighthouse: [0, 1].map(() => add(lighthouse(seed++))),
+      farm: [0, 1, 2, 1].map((v) => add(farm(v, seed++))),
+      windmill: [0, 1].map(() => add(windmill(seed++))),
+      grove: [0, 1, 0, 1, 0, 1].map((v) => add(grove(v, seed++))),
+      hay: [0, 1, 2].map(() => add(hay(seed++))),
+      grandstand: [0, 1].map(() => add(grandstand(seed++))),
+      herd: [0, 1, 0, 1].map((v) => add(herd(v, seed++))),
       balloon: S.balloons.map((c) => add(balloon(c, seed++))),
-      duck: [0, 1].map(() => add(duck(seed++))),
-      dolphins: [0, 1, 2].map(() => add(dolphins(seed++))),
     }
-    arches = [add(arch('rock', seed++)), add(arch('rainbow', seed++))]
+    arches = [add(arch('ranch', seed++)), add(arch('rock', seed++)), add(arch('rainbow', seed++))]
   }
   // Built while the lobby idles, so the first race doesn't hitch.
   setTimeout(build, 2500)
@@ -409,7 +455,7 @@ export function createRaceScenery(scene, home) {
     if (rand() < 0.8) side = -side // mostly alternating, sometimes two on one side
     const x = side * lerp(spec.x, rand())
     const y = spec.y ? lerp(spec.y, rand()) : 0
-    const yaw = kind === 'dolphins' ? 0 : rand() * Math.PI * 2
+    const yaw = spec.facesLane ? (-side * Math.PI) / 2 : rand() * Math.PI * 2 // a grandstand's front (+Z) toward the track
     // The used model goes to the back of its pool, so the next of this kind is another variant.
     built[kind].push(built[kind].splice(built[kind].indexOf(piece), 1)[0])
     place(piece, x, y, z, yaw)
@@ -444,7 +490,7 @@ export function createRaceScenery(scene, home) {
       if (homeZ.length) setHome(0)
       homeZ.length = homeVisible.length = 0
     },
-    // scroll: m the world has slid toward +Z; boatZ: the boat's world z.
+    // scroll: m the world has slid toward +Z; boatZ: the horse's world z.
     update(dt, scroll, boatZ) {
       if (!built) return
       t += dt

@@ -732,3 +732,55 @@ export function paintChecker(a = '#ff5fa8', b = '#ff7fbc', size = 64) {
   ctx.fillRect(size / 2, size / 2, size / 2, size / 2)
   return c
 }
+
+// Dirt track: warm brown fbm, raked furrows running down the track (canvas y = along the
+// track), pebbles and scattered hoof prints. Tileable both ways.
+export function paintDirt(size = 256, seed = 808) {
+  const rand = mulberry32(seed)
+  const field = fbm(size, 6, 4, seed)
+  const c = canvas(size)
+  const ctx = c.getContext('2d')
+  const img = ctx.createImageData(size, size)
+  const lo = hexRgb('#9a6a3e')
+  const hi = hexRgb('#c99662')
+  for (let i = 0; i < size * size; i++) {
+    const x = i % size
+    // Furrows: a soft ridge every size/16 px across the track.
+    const furrow = 0.5 + 0.5 * Math.sin((x / size) * Math.PI * 2 * 16)
+    const t = Math.min(1, Math.max(0, field[i] * 1.2 - 0.1 + furrow * 0.12))
+    for (let k = 0; k < 3; k++) img.data[i * 4 + k] = lo[k] + (hi[k] - lo[k]) * t
+    img.data[i * 4 + 3] = 255
+  }
+  ctx.putImageData(img, 0, 0)
+  const wrapped = (x, y, r, draw) => {
+    for (const ox of [-size, 0, size])
+      for (const oy of [-size, 0, size]) if (!(x + ox + r < 0 || x + ox - r > size || y + oy + r < 0 || y + oy - r > size)) draw(x + ox, y + oy)
+  }
+  // Hoof prints: small dark crescents.
+  for (let i = 0; i < 26; i++) {
+    const x = rand() * size
+    const y = rand() * size
+    const r = size * (0.012 + rand() * 0.008)
+    wrapped(x, y, r * 2, (px, py) => {
+      ctx.strokeStyle = 'rgba(70,42,20,0.45)'
+      ctx.lineWidth = r * 0.7
+      ctx.beginPath()
+      ctx.arc(px, py, r, Math.PI * 0.15, Math.PI * 0.85, true)
+      ctx.stroke()
+    })
+  }
+  // Pebbles: light and dark specks.
+  for (let i = 0; i < 160; i++) {
+    const x = rand() * size
+    const y = rand() * size
+    const r = 0.6 + rand() * 1.6
+    const light = rand() < 0.5
+    wrapped(x, y, r, (px, py) => {
+      ctx.fillStyle = light ? 'rgba(232,206,160,0.8)' : 'rgba(84,54,30,0.6)'
+      ctx.beginPath()
+      ctx.arc(px, py, r, 0, Math.PI * 2)
+      ctx.fill()
+    })
+  }
+  return c
+}

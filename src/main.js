@@ -459,7 +459,6 @@ renderer.setAnimationLoop(() => {
   sendPose({ x: round(player.position.x), y: round(player.position.y), z: round(player.position.z - track), yaw: round(player.facing), speed: round(racing ? race.boatSpeed() : speed) })
   remotes.update(dt, elapsed, player.renderPosition, track, scroll, camera)
   hud.update()
-  world.update(dt, elapsed)
   updateParticles(elapsed, renderer.domElement.height)
   lobby.update(dt, elapsed)
   plaza.update(dt, elapsed)

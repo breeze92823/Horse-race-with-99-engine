@@ -51,6 +51,10 @@ export const BEACH = {
   tile: 18, // m per sand texture tile
   fenceHeight: 3, // invisible wall around the sand so nobody drives into the sea
 }
+// The meadow every world stands in (world.js): grass out to the horizon, under the start island
+// and the race track, scrolled by a race. `tint` multiplies the grass (per world: WORLDS.list.*.ground).
+export const GROUND = { level: -0.05, size: 1400, tile: 9, tint: '#ffffff' }
+// Old sea height: still the foot of the far hills, cliffs and the islet (below the meadow).
 export const WATER = { level: -0.6, size: 1400, color: '#12a9e6', shallow: '#7ff0ff' }
 export const SPAWN = { x: 0, y: 0.05, z: 8 }
 export const SPAWN_FACING = Math.PI // yaw the character faces on spawn (PI = toward -Z, the start gate)
@@ -88,7 +92,7 @@ export const PLAYER_DIMS = { radius: 0.75, height: 1.8 } // wide capsule: it car
 // ~50 m ahead of the spawn. Positions are (x, z) in metres.
 export const LOBBY = {
   gate: { z: -43.5, halfWidth: 19, postHeight: 18.5, bannerY: 14.2, bannerHeight: 5.3, padDepth: 4.6, arrowY: 22.5, arrowScale: 3, arrowSpacing: 10.5 },
-  lane: { length: 160, buoySpacing: 1.9 }, // buoy ropes from the gate posts out to sea
+  lane: { length: 600 }, // the dirt track and rail fences from the gate posts out into the meadow, into the fog (track.js)
   // Red chevron walls, each from its gate end to its far end. The left one follows
   // the shoreline; the right one runs straight back past the spawn, like the shot.
   barrier: {
@@ -369,6 +373,7 @@ export const HORSE = {
   flame: '#38d7ff',
   flameGlow: 3, // HDR multiplier on the engine flames when bloom is on (propkit neon)
   glow: 1.5, // HDR multiplier on a horse's glowing mane / eyes / horn / seams with bloom on
+  dust: { color: '#a9845a', opacity: 0.85, from: 2.5, full: 7 }, // hoof dust: fades in between `from` and `full` m/s
   engineScale: 0.66, // boosters are a bit smaller than the lobby's parked engines
   // Gaits (horse.js): walk -> trot over toTrot m/s, trot -> gallop over toGallop; one cycle per
   // `stride` m (rate clamped to minRate..maxRate Hz). Per gait: duty = share of the cycle a hoof is
@@ -451,11 +456,11 @@ export const WORLDS = {
   // Driving into this circle (radius m, `dz` m from the dais centre toward the spawn) uses the portal.
   portal: { dz: -5.2, radius: 3.2, swapDelay: 0.12 }, // swapDelay: s into the white flash the world changes
   list: {
-    beach: { name: 'Beach', sea: WATER.color, sky: TIME_OF_DAY },
+    beach: { name: 'Beach', ground: GROUND.tint, sky: TIME_OF_DAY },
     city: {
       name: 'City',
       req: { rebirths: 10, power: 200 },
-      sea: '#1d78a6',
+      ground: '#c4d8bc',
       // Golden-hour skyline by day, neon purple by night (N).
       sky: {
         day: {
@@ -890,6 +895,13 @@ export const HUD = {
 // `metresPerStud` m per stud. Top speed = (baseSpeed + speedPerBolt * lightning)
 // x the Acc speed boost (121 bolts -> 145 before boosts, like the reference). Past `cruiseZ` the boat stays put and the
 // lane, sea and trail scroll instead (the sea is only WATER.size wide).
+// --- Race track (track.js) ----------------------------------------------------------------
+// The dirt track past the START gate, the lobby's short one and the race's long one: a dirt strip
+// `margin` m wider than the gate either side, between white rail fences on the gate posts' lines.
+// A race slides the race track by the scroll modulo `tile` (the dirt texture's length, a multiple
+// of postSpacing), so the pattern never jumps.
+export const TRACK = { postSpacing: 4, tile: 8, margin: 1, postSize: [0.22, 1.35, 0.22], rails: [0.62, 1.12], railSize: [0.1, 0.16], wood: '#f6f3ea' }
+
 export const RACE = {
   baseSpeed: 24,
   speedPerBolt: 1,
@@ -908,7 +920,7 @@ export const RACE = {
   finish: 2.5e6,
   steerSpeed: 12, // m/s sideways at full stick
   laneMargin: 3, // m kept clear of the ropes
-  lane: { length: 700, buoySpacing: 1.9, stripe: 1.9 }, // race lane past the gate (replaces the lobby's ropes while racing)
+  lane: { length: 700 }, // race track past the gate (track.js; replaces the lobby's while racing)
   // Scenery streaming past the lane (raceScenery.js): set pieces built once and recycled. One comes
   // every `gap` m (random in the range, mostly alternating sides) from `first` m past the gate; each
   // appears `ahead` m in front of the boat (inside the fog) and is recycled `behind` m behind it. An
@@ -924,23 +936,16 @@ export const RACE = {
     archEvery: 700,
     homeHide: 650,
     kinds: {
-      island: { weight: 5, x: [72, 160] },
-      stack: { weight: 3, x: [40, 95] },
-      ship: { weight: 4, x: [44, 105] },
-      lighthouse: { weight: 1.4, x: [42, 80] },
+      farm: { weight: 4, x: [55, 120] },
+      windmill: { weight: 2, x: [45, 100] },
+      grove: { weight: 5, x: [30, 140] },
+      hay: { weight: 3, x: [27, 60] },
+      grandstand: { weight: 2, x: [34, 40], facesLane: true },
+      herd: { weight: 3, x: [30, 75] },
       balloon: { weight: 2, x: [22, 90], y: [30, 58] },
-      duck: { weight: 1, x: [32, 60] },
-      dolphins: { weight: 2.5, x: [25, 31] },
     },
-    // Anchored ships: boatModels.js spec ({ kind, model colours }) and length (m).
-    ships: [
-      [{ kind: 'galleon', model: { color: '#5a3418', deck: '#7a4a24', sail: '#17171b', trim: '#3a2210', masts: 2, skull: true } }, 30],
-      [{ kind: 'galleon', model: { color: '#1e1f24', deck: '#3a2a1c', sail: '#232428', trim: '#d8a21a', masts: 3 } }, 34],
-      [{ kind: 'galleon', model: { color: '#8a5428', deck: '#b07a44', sail: '#2f9df0', trim: '#5a3418', masts: 3 } }, 32],
-      [{ kind: 'sailboat', model: { color: '#7a4a26', sail: '#8c8378', deck: '#a06a3a', masts: 2 } }, 18],
-      [{ kind: 'tug', model: { color: '#26272c', cabin: '#ffcc22', roof: '#2a2b30', decks: 2, tires: true } }, 22],
-      [{ kind: 'cruiser', model: { color: '#24427e', cabin: '#1d3466', rail: '#cfd6e0' } }, 20],
-    ],
+    barns: ['#c8342a', '#b0442a', '#7a3b2a'], // farm barn walls (trim and roof are white / slate)
+    crowd: ['#ff3b3b', '#2f9df0', '#ffd21a', '#3ddc4a', '#ff7ad8', '#ffffff', '#ff9a1a', '#7a5cff'], // grandstand shirts
     balloons: [['#ff3b3b', '#ffe11a'], ['#2f9df0', '#ffffff'], ['#a01aff', '#3ff0d0', '#ffb21a'], ['#22d34a', '#ffffff', '#ff4a1a']],
     rainbow: ['#ff2a2a', '#ff8a1a', '#ffe11a', '#22d34a', '#1a9cff', '#3a3cff', '#a01aff'],
   },

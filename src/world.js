@@ -4,7 +4,6 @@ import {
   IcosahedronGeometry,
   Mesh,
   MeshLambertMaterial,
-  MeshPhysicalMaterial,
   MeshStandardMaterial,
   PlaneGeometry,
   Shape,
@@ -12,25 +11,24 @@ import {
   SphereGeometry,
   Vector2,
 } from 'three'
-import { BEACH, ISLET, WATER } from './config.js'
+import { BEACH, GROUND, ISLET, WATER } from './config.js'
 import { RAPIER, addFixed } from './physics.js'
-import { mulberry32, paintCrackedSand, paintWaterNormal, toTexture } from './textures.js'
+import { mulberry32, paintCrackedSand, paintGrass, toTexture } from './textures.js'
 import { buildCliff, buildPalm, cliffCollider } from './propkit.js'
 
-// The lobby ground: a pale cracked-sand beach slab in a bright cartoon sea,
-// with green hills on the far left horizon, a rocky islet with palms to the
-// east, and puffy clouds in the sky. The sea and clouds are shared by every
-// world (createWorld); the land is built per world (buildBeachLand here, the
-// City's in city.js, both through buildSlab; environment.js shows one).
+// The lobby ground: a pale cracked-sand slab in a grass meadow that runs to the
+// horizon (the race track crosses it), with green hills on the far left
+// horizon, a rocky islet with palms to the east, and puffy clouds in the sky.
+// The meadow and clouds are shared by every world (createWorld); the land is
+// built per world (buildBeachLand here, the City's in city.js, both through
+// buildSlab; environment.js shows one).
 // Physically the land is one convex-hull collider plus an invisible fence on
 // every edge (landColliders, the same in every world).
 //
 // Texture techniques used here:
 //  - sand: tileable Voronoi cells + cracks -> colour + derived normal map,
 //    world-space UVs (ExtrudeGeometry caps use shape coordinates = metres)
-//  - sea: one ripple normal map used twice (normalMap + clearcoatNormalMap) at
-//    different scales, scrolled in different directions each frame, over a
-//    lighter shallow-water band hugging the shore
+//  - meadow: the grass painter's colour + bump, its v offset scrolled by a race
 
 // Beach outline in world (x, z), counter-clockwise seen from above. Convex.
 export function beachOutline() {
@@ -76,11 +74,7 @@ export function makeHill(x, z, rx, ry, rz, color, seed) {
   const hill = new Mesh(geo, new MeshStandardMaterial({ color, roughness: 1 }))
   hill.scale.set(rx, ry, rz)
   hill.position.set(x, WATER.level - 1, z)
-  // A sand rim where it meets the water.
-  const rim = new Mesh(new SphereGeometry(1, 40, 6, 0, Math.PI * 2, 0, Math.PI / 2), new MeshStandardMaterial({ color: '#f1dca6', roughness: 1 }))
-  rim.scale.set(rx * 1.08, 3, rz * 1.12)
-  rim.position.set(x, WATER.level - 1.6, z)
-  return [hill, rim]
+  return [hill]
 }
 
 function makeClouds() {
@@ -197,42 +191,28 @@ export function landColliders() {
   cliffCollider(isletRock(), WATER.level - 1)
 }
 
-// What every world shares: the sea (its colour set per world) and the clouds.
+// What every world shares: the meadow (its tint set per world) and the clouds.
 export function createWorld(scene) {
-  // Sea: physical material, two scrolling ripple layers, slightly see-through.
-  const ripples = paintWaterNormal()
-  const normalA = toTexture(ripples, { repeat: WATER.size / 14 })
-  const normalB = toTexture(ripples, { repeat: WATER.size / 37 })
-  const sea = new Mesh(
-    new PlaneGeometry(WATER.size, WATER.size),
-    new MeshPhysicalMaterial({
-      color: WATER.color,
-      roughness: 0.3,
-      metalness: 0,
-      normalMap: normalA,
-      normalScale: new Vector2(0.3, 0.3),
-      clearcoat: 1,
-      clearcoatRoughness: 0.08,
-      clearcoatNormalMap: normalB,
-      clearcoatNormalScale: new Vector2(0.5, 0.5),
-      transparent: true,
-      opacity: 0.94,
-    }),
+  // Meadow: the grass painter (colour + bump), one tile every GROUND.tile m, to the horizon.
+  const grass = paintGrass()
+  const map = toTexture(grass.color, { repeat: GROUND.size / GROUND.tile, srgb: true })
+  const bump = toTexture(grass.height, { repeat: GROUND.size / GROUND.tile })
+  const meadow = new Mesh(
+    new PlaneGeometry(GROUND.size, GROUND.size),
+    new MeshStandardMaterial({ color: GROUND.tint, map, bumpMap: bump, bumpScale: 0.6, roughness: 1, metalness: 0 }),
   )
-  sea.rotation.x = -Math.PI / 2
-  sea.position.y = WATER.level
-  sea.receiveShadow = true
-  scene.add(sea, makeClouds())
+  meadow.rotation.x = -Math.PI / 2
+  meadow.position.y = GROUND.level
+  meadow.receiveShadow = true
+  scene.add(meadow, makeClouds())
 
-  let scroll = 0 // m the sea has slid toward +Z (a race past RACE.cruiseZ moves the sea, not the boat)
   return {
-    setSeaColor: (color) => sea.material.color.set(color),
-    setScroll: (m) => (scroll = m),
-    update(dt, elapsed) {
-      // One ripple tile is 14 m (A) / 37 m (B); v runs toward -Z.
-      // Wrapped to one tile: a 2 h race scrolls ~875 km, too far for a float32 offset.
-      normalA.offset.set(elapsed * 0.012, elapsed * 0.02 + ((scroll / 14) % 1))
-      normalB.offset.set(-elapsed * 0.008, elapsed * 0.005 + ((scroll / 37) % 1))
+    setGroundColor: (color) => meadow.material.color.set(color),
+    // m the world has slid toward +Z (a race past RACE.cruiseZ moves the world, not the horse).
+    // Wrapped to one tile: a 2 h race scrolls ~875 km, too far for a float32 offset.
+    setScroll(m) {
+      const v = (m / GROUND.tile) % 1
+      map.offset.y = bump.offset.y = v
     },
   }
 }

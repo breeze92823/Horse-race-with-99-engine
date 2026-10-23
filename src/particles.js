@@ -1,4 +1,4 @@
-import { AdditiveBlending, BufferGeometry, CanvasTexture, Color, Float32BufferAttribute, Points, ShaderMaterial, SRGBColorSpace } from 'three'
+import { AdditiveBlending, BufferGeometry, CanvasTexture, Color, Float32BufferAttribute, NormalBlending, Points, ShaderMaterial, SRGBColorSpace } from 'three'
 import { mulberry32, paintSoftDot, paintSparkle } from './textures.js'
 
 // GPU particles. Each emitter is one Points object whose particles loop
@@ -7,7 +7,8 @@ import { mulberry32, paintSoftDot, paintSparkle } from './textures.js'
 // CPU only advances one shared time uniform per frame (no per-frame
 // allocation, cheap on phones). Every particle has a random spawn point in
 // one of the emitter's boxes, a random phase so they never pulse in sync, and
-// a random velocity jitter. Additive and HDR-bright, so bloom makes them glow.
+// a random velocity jitter. Additive and HDR-bright, so bloom makes them glow
+// (unless `solid`: normal blending, for dust).
 // The graphics preset's `particles` density trims each emitter's draw range.
 const shared = {
   uTime: { value: 0 },
@@ -76,7 +77,7 @@ const fragmentShader = /* glsl */ `
 //   count, life (s), velocity [x,y,z], spread [x,y,z] (velocity jitter),
 //   gravity (m/s^2, down), size (m), grow (size multiplier at end of life),
 //   color, intensity (HDR multiplier), opacity, twinkle (rad/s, 0 = steady),
-//   sprite: 'dot' | 'sparkle', seed
+//   sprite: 'dot' | 'sparkle', seed, solid (normal blending instead of additive: dust, not light)
 // }
 export function createEmitter(scene, opts) {
   const rand = mulberry32(opts.seed ?? 1)
@@ -116,7 +117,7 @@ export function createEmitter(scene, opts) {
     fragmentShader,
     transparent: true,
     depthWrite: false,
-    blending: AdditiveBlending,
+    blending: opts.solid ? NormalBlending : AdditiveBlending,
   })
   const points = new Points(geo, mat)
   points.frustumCulled = false // positions move in the shader; the bounds would be wrong
