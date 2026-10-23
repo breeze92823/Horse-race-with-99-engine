@@ -1,7 +1,7 @@
 // Every tunable constant lives here; the rest of src/ holds no theme values.
 
 // --- Identity -------------------------------------------------------------
-export const GAME_SLUG = 'horse-race-with-99-engine' // slug registered on bloxity.io
+export const GAME_SLUG = 'horse-race' // game id on bloxity.io (hosting + matchmaker use it)
 export const GAME_TITLE = 'Horse Race'
 
 // Forces the Bloxity SDK and avatar CDN to be treated as unavailable (see .env.example).
