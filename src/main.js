@@ -5,6 +5,7 @@ import { initNet, net, onNetMessage, sendLoadout, sendPose, syncAvatar } from '.
 import { inputState, install as installInput, onKey } from './input.js'
 import { installTouch } from './touch.js'
 import { createHud } from './hud.js'
+import { createLoginButton } from './login.js'
 import { anyWindowOpen, closeTopWindow, setWindowReserved } from './uiWindow.js'
 import { hoofbeat, installAudio, setVolume, sfx, toggleMuted, updateAudio } from './audio/index.js'
 import { createRebirth } from './rebirth.js'
@@ -71,6 +72,7 @@ function applySetting(key, value) {
 }
 bloxity.onSetting(applySetting)
 bloxity.init()
+createLoginButton()
 installAudio() // starts on the first tap / key (browser autoplay rules)
 
 // --- Renderer ---------------------------------------------------------------
