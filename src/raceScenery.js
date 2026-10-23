@@ -354,9 +354,9 @@ function arch(kind, seed) {
       tex.needsUpdate = true
     })
     const w = 16
-    const board = put(g, new PlaneGeometry(w, (w * sign.canvas.height) / sign.canvas.width), std('#ffffff', { map: tex, roughness: 0.9, side: DoubleSide }), 0, H + 1.9, 0)
-    board.rotation.y = Math.PI // readable from the oncoming side (+Z)
-    put(g, new TorusGeometry(1.4, 0.32, 8, 20, Math.PI * 1.4), std('#ffcf3a', { roughness: 0.3, metalness: 0.7 }), 0, H - 2.6, 0, 0, 0, Math.PI * 1.2)
+    // The board: a plane faces +Z, the side the riders come from, so it reads as is.
+    put(g, new PlaneGeometry(w, (w * sign.canvas.height) / sign.canvas.width), std('#ffffff', { map: tex, roughness: 0.9, side: DoubleSide }), 0, H + 1.9, 0)
+    put(g, new TorusGeometry(1.4, 0.32, 8, 20, Math.PI * 1.4), std('#ffcf3a', { roughness: 0.3, metalness: 0.7 }), 0, H - 2.6, 0, 0, 0, Math.PI * 0.8) // a U, open at the top (for luck)
   } else {
     const palette = S.rainbow.map((c) => new Color(c))
     const T = 2.6
