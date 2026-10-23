@@ -33,16 +33,15 @@ function short(n) {
   return `${n >= 100 || i === 0 ? Math.floor(n) : Math.floor(n * 10) / 10}${SUFFIXES[i]}`
 }
 
-// The saved part (net.js; backend sanitize.ts): { boats: owned horse ids, boat: the equipped one }
-// (the save still uses the boat game's field names).
-export const snapshot = () => ({ boats: [...horseState.owned], boat: horseState.equipped })
+// The saved part (net.js; backend sanitize.ts): { horses: owned ids, horse: the equipped one }.
+export const snapshot = () => ({ horses: [...horseState.owned], horse: horseState.equipped })
 
 // A loaded save over a fresh start (unknown ids dropped, an unowned horse not equipped).
 function applySave(s) {
   horseState.owned = new Set(HORSES.start.owned)
   horseState.equipped = HORSES.start.equipped
-  if (Array.isArray(s.boats)) for (const id of s.boats) if (horseById(id)) horseState.owned.add(id)
-  if (horseState.owned.has(s.boat)) horseState.equipped = s.boat
+  if (Array.isArray(s.horses)) for (const id of s.horses) if (horseById(id)) horseState.owned.add(id)
+  if (horseState.owned.has(s.horse)) horseState.equipped = s.horse
 }
 
 const BODY = `

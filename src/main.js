@@ -357,7 +357,7 @@ let gearKey = ''
 let enginesKey = ''
 function syncGear() {
   const gear = {
-    boat: horseState.equipped ?? '', // (the loadout keeps the boat game's field name)
+    horse: horseState.equipped ?? '',
     engine: engineState.equipped ?? '',
     trail: trailState.equipped ?? '',
     partner: partnerState.equipped ?? '',
@@ -367,10 +367,10 @@ function syncGear() {
   const key = JSON.stringify(gear)
   if (key === gearKey) return
   gearKey = key
-  const ek = `${gear.boat}|${gear.engine}`
+  const ek = `${gear.horse}|${gear.engine}`
   if (ek !== enginesKey) {
     enginesKey = ek
-    horse.setEngines(engineLooks.get(gear.engine) ?? null, horseEngines.get(gear.boat) ?? 1)
+    horse.setEngines(engineLooks.get(gear.engine) ?? null, horseEngines.get(gear.horse) ?? 1)
   }
   companions.setPets(gear.pets)
   companions.setPartner(gear.partner)

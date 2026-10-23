@@ -188,8 +188,7 @@ export function sendPose(pose) {
   send('pose', pose)
 }
 let loadoutKey = ''
-// { boat (the equipped horse: the boat game's field name), engine, trail, partner, pets: [{ kind,
-// tier }], world }: sent when it changes.
+// { horse, engine, trail, partner, pets: [{ kind, tier }], world }: sent when it changes.
 export function sendLoadout(loadout) {
   presence.loadout = loadout
   const key = JSON.stringify(loadout)

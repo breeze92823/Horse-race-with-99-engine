@@ -50,7 +50,7 @@ class Remote {
     this.animator = null
     this.avatarJson = null // what the current rig was built from
     this.generation = 0
-    this.applied = {} // boat (= horse) / engine / trail / pets / partner / name as last applied
+    this.applied = {} // horse / engine / trail / pets / partner / name as last applied
     this.label = null
     this.placed = false
     this.detail = true
@@ -96,14 +96,14 @@ class Remote {
   // Gear and name: rebuilt only when they change.
   syncGear(p) {
     const a = this.applied
-    if (p.boat !== a.boat) {
-      a.boat = p.boat
-      this.horse.setLook(horseLook(horseById.has(p.boat) ? p.boat : HORSES.start.equipped)) // none sent yet: the starter
+    if (p.horse !== a.horse) {
+      a.horse = p.horse
+      this.horse.setLook(horseLook(horseById.has(p.horse) ? p.horse : HORSES.start.equipped)) // none sent yet: the starter
       a.engine = undefined // the booster count comes with the horse
     }
     if (p.engine !== a.engine) {
       a.engine = p.engine
-      const count = horseById.get(horseById.has(p.boat) ? p.boat : HORSES.start.equipped)?.engines ?? 1
+      const count = horseById.get(horseById.has(p.horse) ? p.horse : HORSES.start.equipped)?.engines ?? 1
       this.horse.setEngines(engineById.get(p.engine)?.look ?? null, count)
     }
     if (p.trail !== a.trail) {
@@ -225,7 +225,7 @@ export function createRemotePlayers(scene) {
         })
         st.pets = r.companions.petCount
         st.meshes += st.pets + (r.applied.trailShown ? 1 : 0)
-        return { boat: r.applied.boat, engine: r.applied.engine, ...st }
+        return { horse: r.applied.horse, engine: r.applied.engine, ...st }
       })
     },
     // viewer: this player's drawn position; scroll: this player's race scroll (m, race.trackScroll)
