@@ -23,17 +23,17 @@ import {
 import { LOBBY, SPAWN } from './config.js'
 import { buildTrack } from './track.js'
 import { makeEngine } from './horse.js'
-import { paintChecker, paintChevrons, paintFade, paintSoftDot } from './textures.js'
+import { paintFade, paintPlanks, paintSoftDot } from './textures.js'
 import { fontReady, glow, label, neon, put, solidBox, solidPole, std } from './propkit.js'
 import { createEmitter } from './particles.js'
 
 // Everything standing on the lobby beach, laid out like the reference shot
 // from the spawn looking toward the sea (-Z):
 //  - the START gate at the shoreline: two black posts, a black banner, a
-//    glowing yellow start pad with a light curtain, and red/yellow buoy ropes
-//    marking the lane out to sea; three red arrows bob above it
-//  - red chevron barriers on both sides, a checkered pink walkway with a
-//    neon yellow rim inland of the right one, with four hero statues on it in
+//    glowing yellow start pad with a light curtain, and the dirt track with
+//    rail fences out into the meadow (track.js); three red arrows bob above it
+//  - plank corral walls on both sides, a wooden boardwalk with a neon
+//    yellow rim inland of the right one, with four hero statues on it in
 //    front of the taller wall (name + stat tags, coloured auras and sparkles)
 //  - on the left: the Engine Upgrade machine (caged, flaming, smoking, a
 //    glowing gold ring, a parked log raft), two engine rockets hovering over
@@ -171,21 +171,21 @@ function alongLine(root, line, t0, t1, off, size, y, mat) {
 
 function buildBarriers(root) {
   const B = LOBBY.barrier
-  const chevrons = paintChevrons(C.barrier)
+  const planks = paintPlanks(512, 6, 21).color
   const cap = std('#ffffff', { roughness: 0.5 })
   const plain = std(C.barrier, { roughness: 0.55 })
   for (const spec of B.lines) {
     if (spec.wall === 0) continue
     const line = barrierLine(spec)
-    const len = spec.wall ?? line.len // metres of chevron wall from the gate end
+    const len = spec.wall ?? line.len // metres of plank wall from the gate end
     const height = spec.height ?? B.height
-    // Local +X runs toward the gate so the chevrons point at it. If local +Z
-    // faces the sea, the wall is turned round and the texture mirrored.
+    // Horizontal boards, one texture tile every 4 m. If local +Z faces out of the yard, the
+    // wall is turned round so its boarded face looks inland.
     const facesInland = -line.uz * line.nx + line.ux * line.nz > 0
-    const tex = new CanvasTexture(chevrons)
+    const tex = new CanvasTexture(planks)
     tex.colorSpace = SRGBColorSpace
     tex.wrapS = RepeatWrapping
-    tex.repeat.set((facesInland ? 1 : -1) * Math.round(len / (height * 2)), 1)
+    tex.repeat.set(Math.max(1, Math.round(len / 4)), 1)
     const face = std('#ffffff', { map: tex, roughness: 0.55 })
     const wall = alongLine(root, line, 0, len, 0, [height, 0.45], height / 2, [plain, plain, plain, plain, face, face])
     if (!facesInland) wall.rotation.y += Math.PI
@@ -193,7 +193,7 @@ function buildBarriers(root) {
     top.rotation.y = line.yaw
   }
 
-  // Raised checkered pink walkways (red sides, neon yellow rim on both long
+  // Raised plank boardwalks (wooden sides, neon yellow rim on both long
   // edges) inland of the flagged lines.
   const W = LOBBY.walkway
   const side = std(C.barrier, { roughness: 0.6 })
@@ -202,11 +202,11 @@ function buildBarriers(root) {
     const line = barrierLine(spec)
     if (!spec.walkway) continue
     const len = line.len - 2
-    const checks = new CanvasTexture(paintChecker(C.walkway, C.walkwayLight))
-    checks.colorSpace = SRGBColorSpace
-    checks.wrapS = checks.wrapT = RepeatWrapping
-    checks.repeat.set(len / W.check, W.width / W.check)
-    const top = std('#ffffff', { map: checks, roughness: 0.7 })
+    const boards = new CanvasTexture(planks)
+    boards.colorSpace = SRGBColorSpace
+    boards.wrapS = boards.wrapT = RepeatWrapping
+    boards.repeat.set(len / W.check, W.width / W.check)
+    const top = std(C.walkway, { map: boards, roughness: 0.8 })
     alongLine(root, line, 1, line.len - 1, 0.25 + W.width / 2, [W.height, W.width], W.height / 2, [side, side, top, side, side, side])
     for (const off of [0.3, 0.25 + W.width - 0.05]) alongLine(root, line, 1, line.len - 1, off, [0.1, 0.18], W.height + 0.04, rim)
   }
@@ -307,7 +307,7 @@ const STATUES = [
   },
 ]
 
-// The statues stand on the pink walkway in front of the (taller) statue wall.
+// The statues stand on the boardwalk in front of the (taller) statue wall.
 // Each one's spot (above its head) goes into `spots` for its interact prompt.
 function buildStatues(root, spots) {
   const S = LOBBY.statues

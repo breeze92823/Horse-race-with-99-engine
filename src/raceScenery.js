@@ -1,7 +1,7 @@
 import { BoxGeometry, CanvasTexture, Color, ConeGeometry, CylinderGeometry, DodecahedronGeometry, DoubleSide, Euler, Float32BufferAttribute, Group, IcosahedronGeometry, Matrix4, Mesh, PlaneGeometry, Quaternion, SphereGeometry, SRGBColorSpace, TorusGeometry, Vector3 } from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { GROUND, LOBBY, PLAZA, RACE, WATER } from './config.js'
-import { fontReady, std } from './propkit.js'
+import { buildOak, fontReady, std } from './propkit.js'
 import { mulberry32, paintText } from './textures.js'
 import { bake } from './bake.js'
 
@@ -75,19 +75,8 @@ const put = (g, geo, mat, x, y, z, rx = 0, ry = 0, rz = 0) => {
   return m
 }
 
-// A round cartoon oak: a trunk and a cluster of leafy balls.
-const LEAVES = ['#3f9e32', '#4fb33c', '#5cbf45', '#378a2c']
-function oak(g, x, z, h, rand, y = FOOT) {
-  const trunk = std('#7a4f2a', { roughness: 1 })
-  put(g, new CylinderGeometry(0.35 * h / 6, 0.55 * h / 6, h * 0.6, 7), trunk, x, y + h * 0.3, z)
-  const r = h * 0.38
-  for (let i = 0; i < 4; i++) {
-    const a = (i / 4) * Math.PI * 2 + rand() * 1.2
-    const d = i === 0 ? 0 : r * 0.55
-    const ball = put(g, new IcosahedronGeometry(r * (i === 0 ? 1 : 0.75), 1), std(LEAVES[Math.floor(rand() * LEAVES.length)], { roughness: 1, flatShading: true }), x + Math.cos(a) * d, y + h * 0.72 + (i === 0 ? r * 0.3 : 0), z + Math.sin(a) * d)
-    ball.rotation.set(rand() * 3, rand() * 3, 0)
-  }
-}
+// An oak (propkit.js), seeded from the piece's own random stream; no collider out here.
+const oak = (g, x, z, h, rand, y = FOOT) => buildOak(g, x, z, h, Math.floor(rand() * 1e6), y, false)
 
 // A gable roof over a w x d box whose walls end at `top`, ridge along its depth (turned by `yaw`):
 // two slate slabs over a gable prism (a 3-sided cylinder lying down) in the wall colour.

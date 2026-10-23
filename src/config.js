@@ -38,23 +38,36 @@ export const NET = {
 
 // --- World (metres: +X east, +Z south, +Y up) -------------------------------
 export const GROUND_Y = 0
-// The lobby beach (world.js): one convex sand slab. The shoreline sweeps from
-// the start gate (front, -Z) back toward +Z on both wings, so the side barriers
-// funnel toward the gate like the reference shot.
+// The start island (world.js): one convex slab, a grass ranch yard with packed-dirt areas. Its
+// front edge sweeps from the start gate (front, -Z) back toward +Z on both wings, so the side
+// barriers funnel toward the gate like the reference shot.
 export const BEACH = {
   front: -46, // z of the shoreline at the start gate
   back: 90, // z of the back edge
   halfWidth: 75, // x extent of the wings
   wingZ: 24, // z of the shoreline at the far left/right ends
   gateEdge: 21.5, // half-width of the straight shoreline in front of the gate
-  depth: 4, // slab thickness above the sea floor
-  tile: 18, // m per sand texture tile
-  fenceHeight: 3, // invisible wall around the sand so nobody drives into the sea
+  depth: 4, // slab thickness
+  fenceHeight: 3, // invisible wall around the yard so nobody rides off into the meadow
+  side: '#7a5a3a', // the slab's earth edge
+  grass: '#e8ffd8', // tint on the yard's grass (the meadow's texture, a little fresher)
+  dirtTile: 8, // m per dirt texture tile
+  // Packed-dirt areas, rounded rectangles [x0, z0, x1, z1, corner radius]: the arena from the
+  // spawn to the gate, the stall aprons, the path to the plaza and the training yards.
+  dirt: [
+    [-21, -46, 21, 16, 8],
+    [-34, 0, -16, 24, 4],
+    [16, 0, 34, 24, 4],
+    [-8, 10, 8, 50, 5],
+    [-31, 27, -10, 50, 6],
+    [10, 27, 31, 50, 6],
+  ],
 }
 // The meadow every world stands in (world.js): grass out to the horizon, under the start island
-// and the race track, scrolled by a race. `tint` multiplies the grass (per world: WORLDS.list.*.ground).
+// and the race track, scrolled by a race. `tint` multiplies the grass (per world: WORLDS.list.*.ground,
+// which can also swap the grass for dirt).
 export const GROUND = { level: -0.05, size: 1400, tile: 9, tint: '#ffffff' }
-// Old sea height: still the foot of the far hills, cliffs and the islet (below the meadow).
+// Old sea height: still the sunk foot of the far hills, the plaza cliffs' neighbours and the hill.
 export const WATER = { level: -0.6, size: 1400, color: '#12a9e6', shallow: '#7ff0ff' }
 export const SPAWN = { x: 0, y: 0.05, z: 8 }
 export const SPAWN_FACING = Math.PI // yaw the character faces on spawn (PI = toward -Z, the start gate)
@@ -93,17 +106,17 @@ export const PLAYER_DIMS = { radius: 0.75, height: 1.8 } // wide capsule: it car
 export const LOBBY = {
   gate: { z: -43.5, halfWidth: 19, postHeight: 18.5, bannerY: 14.2, bannerHeight: 5.3, padDepth: 4.6, arrowY: 22.5, arrowScale: 3, arrowSpacing: 10.5 },
   lane: { length: 600 }, // the dirt track and rail fences from the gate posts out into the meadow, into the fog (track.js)
-  // Red chevron walls, each from its gate end to its far end. The left one follows
-  // the shoreline; the right one runs straight back past the spawn, like the shot.
+  // Plank corral walls, each from its gate end to its far end. The left one follows
+  // the yard's front edge; the right one runs straight back past the spawn, like the shot.
   barrier: {
     height: 2,
     lines: [
       { from: [-22.5, -43], to: [-62, 8] },
-      // wall: metres of chevron wall from the gate end (default the whole line, 0 = none)
+      // wall: metres of plank wall from the gate end (default the whole line, 0 = none)
       { from: [23, -43], to: [20, 25], wall: 47, height: 3.2, walkway: true, statues: true },
     ],
   },
-  walkway: { width: 3.2, height: 0.4, check: 1.6 }, // raised checkered pink strip with red sides; check = m per 2x2 tile
+  walkway: { width: 3.2, height: 0.4, check: 3.2 }, // raised plank boardwalk with wooden sides; check = m per plank texture tile
   statues: { at: [22, 28, 34, 40], scale: 1.05 }, // on the right walkway, m from the wall's gate end
   upgrade: { x: -20, z: -18, scale: 1.6 },
   rockets: [
@@ -112,32 +125,29 @@ export const LOBBY = {
     { name: 'BLAZE DRIFT', engine: 'blaze', x: -16, z: -31, label: '#ff3b3b', body: '#1a1b22', nose: '#e8262b', fin: '#e8262b', stripe: '#ffffff' },
   ],
   rocketScale: 1.25,
-  umbrella: { x: -31, z: -20, scale: 2.1 },
-  palms: [
-    // x, z, height, leanX, leanZ (the back of the beach has its own, in PLAZA)
-    [-36, 0, 16, 0.5, -0.15],
-    [-46, -6, 12, 0.2, -0.3],
-    [25, -6, 15, -0.45, -0.15],
-    [36, -14, 12, -0.25, -0.2],
-    [52, 6, 11, -0.15, -0.3],
-    [-50, 10, 14, 0.1, -0.2], // behind the boat stall (west view)
-    [-34, -22, 12, -0.2, 0.2],
+  pump: { x: -31, z: -20, scale: 1.6 }, // the ranch's wind pump (the Frontier Town's welcome sign)
+  trees: [
+    // x, z, height (the plaza has its own, in PLAZA)
+    [-36, 0, 16],
+    [-46, -6, 12],
+    [25, -6, 15],
+    [36, -14, 12],
+    [52, 6, 11],
+    [-50, 10, 14], // behind the horse stall (west view)
+    [-38, -12, 12], // clear of the wind pump
   ],
   colors: {
     banner: '#0c0d14',
     bannerFrame: '#3d8bff',
     pad: '#ffd21a',
-    barrier: '#e0262b',
-    walkway: '#ff5fa8',
-    walkwayLight: '#ff86c0',
-    buoyA: '#ff3030',
-    buoyB: '#ffd21a',
+    barrier: '#8a5a32', // the plank corral walls' frame
+    walkway: '#c99a62', // the boardwalks' plank tint
     arrow: '#e81e1e',
   },
 }
 
-// Palm trees (propkit.js), shared by the lobby and the plaza.
-export const PALM = { trunk: '#a8743f', leaf: '#3fae2c' }
+// Oak trees (propkit.js), shared by the ranch, the plaza, the hill and the race scenery.
+export const OAK = { trunk: '#7a4f2a', leaves: ['#3f9e32', '#4fb33c', '#5cbf45', '#378a2c'] }
 
 // --- Training plaza at the back of the beach (plaza.js) ---------------------------
 // The reference's south view: two Train stations either side of a VIP portal
@@ -200,22 +210,22 @@ export const PLAZA = {
     [-15, 56, 12, 8, 13, 0.1],
     [16, 56, 12, 8, 11, -0.1],
   ],
-  // x, z, y (cliff top or 0), height, leanX, leanZ
-  palms: [
-    [-8, 62, 32, 11, -0.1, -0.2],
-    [10, 67, 32, 12, 0.15, -0.15],
-    [-24, 67, 27, 12, 0.2, -0.2],
-    [-38, 74, 27, 11, 0, -0.2],
-    [26, 68, 25, 12, -0.2, -0.2],
-    [40, 75, 25, 11, 0, -0.2],
-    [-50, 42, 22, 11, 0.3, -0.2],
-    [-58, 60, 22, 10, 0.2, -0.1],
-    [50, 40, 24, 12, -0.3, -0.2],
-    [60, 62, 24, 10, -0.2, -0.1],
-    [-15, 55, 13, 9, 0.1, -0.3],
-    [16, 55, 11, 10, -0.1, -0.3],
-    [38, 25, 0, 13, -0.3, -0.1],
-    [-42, 32, 0, 12, 0.3, -0.1],
+  // x, z, y (cliff top or 0), height
+  trees: [
+    [-8, 62, 32, 11],
+    [10, 67, 32, 12],
+    [-24, 67, 27, 12],
+    [-38, 74, 27, 11],
+    [26, 68, 25, 12],
+    [40, 75, 25, 11],
+    [-50, 42, 22, 11],
+    [-58, 60, 22, 10],
+    [50, 40, 24, 12],
+    [60, 62, 24, 10],
+    [-15, 55, 13, 9],
+    [16, 55, 11, 10],
+    [38, 25, 0, 13],
+    [-42, 32, 0, 12],
   ],
   rock: '#966a6c',
   rockDark: '#6c4a52',
@@ -351,8 +361,9 @@ export const HORSES = {
   thumb: { width: 256, height: 320, outline: 7, budgetMs: 12 }, // px of each rendered tile picture, ms of drawing per frame (horseThumbs.js)
 }
 
-// A small rocky islet with palms out at sea, seen past the stall in the east view.
-export const ISLET = { x: 115, z: -40, rock: [0, 0, 28, 18, 18, 0.3], hill: { rx: 36, ry: 7, rz: 24 } }
+// A wooded hill out in the meadow, seen past the stall in the east view (the Frontier Town's
+// water tower stands on top). trees: [x, z, height] from its centre.
+export const ISLET = { x: 115, z: -40, hill: { rx: 36, ry: 9, rz: 24 }, trees: [[-6, -3, 12], [5, 4, 10], [12, -6, 9], [-14, 6, 8]] }
 
 // --- Player horse (horse.js) -----------------------------------------------------
 export const HORSE = {
@@ -444,10 +455,11 @@ export const LIGHT = {
   lampDistance: 22,
 }
 
-// --- Worlds (worlds.js, environment.js, city.js) -------------------------------------
-// One start island in two looks. The layout, colliders, shops, lanes, portal and races
-// are shared; a world only changes the scenery: ground, sea, sky, the far horizon, the
-// plaza's cliffs, the trees, the umbrella and the islet. The VIP portal on the plaza
+// --- Worlds (worlds.js, environment.js, town.js) -------------------------------------
+// One start island in two looks: the ranch (id `beach`) and the Frontier Town (id `city`;
+// the ids are saved, so they keep the boat game's names). The layout, colliders, shops,
+// tracks, portal and races are shared; a world only changes the scenery: the yard, the
+// meadow tint, sky, the far horizon, the plaza's cliffs, the trees, the pump and the hill. The VIP portal on the plaza
 // (PLAZA.vip) moves the player between them: to a world with `req` once the player
 // has that many rebirths and that much Power (lightning) at the same time (after that
 // it stays open, saved by the server), back to the beach at any time.
@@ -456,12 +468,12 @@ export const WORLDS = {
   // Driving into this circle (radius m, `dz` m from the dais centre toward the spawn) uses the portal.
   portal: { dz: -5.2, radius: 3.2, swapDelay: 0.12 }, // swapDelay: s into the white flash the world changes
   list: {
-    beach: { name: 'Beach', ground: GROUND.tint, sky: TIME_OF_DAY },
+    beach: { name: 'Ranch', ground: { texture: 'grass', tint: GROUND.tint }, sky: TIME_OF_DAY },
     city: {
-      name: 'City',
+      name: 'Frontier Town',
       req: { rebirths: 10, power: 200 },
-      ground: '#c4d8bc',
-      // Golden-hour skyline by day, neon purple by night (N).
+      ground: { texture: 'sand', tint: '#ffffff' }, // sun-baked desert (TOWN.sand)
+      // Golden-hour desert by day, purple by night (N).
       sky: {
         day: {
           zenith: '#4560c4',
@@ -498,28 +510,26 @@ export const WORLDS = {
   },
 }
 
-// The City look (city.js). Buildings stand on the beach's cliff footprints (PLAZA.cliffs, ISLET.rock)
-// with the same colliders; street trees and lamps take the palms' places.
-export const CITY = {
-  pavement: { base: '#d2cdc6', alt: '#c0bab2', joint: '#8a857e', tile: 16 }, // tile: m per texture tile (4x4 slabs)
-  slabSide: '#7e838d',
-  shallow: '#62c8da',
-  park: '#5a9f4a', // the islet's lawn
-  buildings: {
-    floor: 4, // m per storey (one row of windows); a window column every 2 m
-    walls: ['#f1e7d9', '#d9e3f1', '#f3d8ca', '#d0d9de', '#e9e1f3', '#c9d7ea', '#e8d2b8'],
-    glass: '#2b4f7e',
-    lit: '#ffd27a', // a lit window's glow
-    roof: '#5b606b',
-    podium: '#4a4f5a', // the shop floor along the foot of each block
-    rims: ['#ff4fd8', '#3ff0ff', '#ffd21a', '#7dff6a'], // neon along the roof edges
-    height: [1.5, 2.6], // a tower is this many times the cliff it replaces
-  },
-  // Far horizon: rings of towers instead of the beach's green hills.
-  skyline: { count: 54, distance: [270, 480], height: [45, 160], width: [18, 44], seed: 77 },
-  tree: { trunk: '#6e4b2c', leaf: '#3e9a3a', leafLight: '#79c94c', planter: '#9ba1ab' },
-  lamp: { pole: '#2a2d35', light: '#ffdca8' },
-  umbrella: ['#2a6fff', '#ffffff'],
+// The Frontier Town look (town.js), the second world (id `city`). It stands on the ranch's
+// footprints with the same colliders: the tall plaza cliffs become red sandstone buttes, the low
+// ones wooden storefronts facing the plaza (`plaza` = the point their fronts turn toward), cacti
+// and oil lamps take the oaks' places, a water tower stands on the hill, red mesas ring the horizon.
+export const TOWN = {
+  sand: ['#d6a46c', '#f0d09c'], // the desert dirt's dark / light (paintDirt), on the slab and to the horizon
+  side: '#b07a4a',
+  butteFrom: 20, // m: a footprint at least this tall is a butte, not a building
+  rock: { rock: '#d07a48', rockDark: '#8a3a22', grass: '#e3b27a', grassLight: '#f2cf98' }, // buildCliff palette
+  plaza: [0, 30],
+  shops: ['SALOON', 'GENERAL STORE', 'SHERIFF', 'BANK', 'HOTEL', 'BARBER', 'BLACKSMITH', 'POST OFFICE'],
+  planks: '#e6dccb', // pale weathered boards, painted by `walls`
+  walls: ['#b07a4a', '#f4ead8', '#9cc4d8', '#e89a82', '#b8d49a', '#f2d27a', '#c8a0d8', '#8a5a32'], // paint on the plank walls
+  trim: '#f6f1e6',
+  roof: '#6b4428',
+  cactus: '#3f8a3a',
+  lamp: { post: '#4a2f1c', light: '#ffcf7a' },
+  tower: { wood: '#9a6a3e', tank: '#b07a4a', roof: '#6b4428' }, // the water tower on the hill
+  // Far horizon: red mesas instead of the hills, none in the race track's way.
+  mesas: { count: 26, distance: [260, 470], height: [22, 60], width: [40, 110], seed: 77 },
 }
 
 // Default (fallback) character look, used only when player.glb cannot load.

@@ -9,28 +9,28 @@ import {
   Shape,
   ShapeGeometry,
   SphereGeometry,
-  Vector2,
 } from 'three'
-import { BEACH, GROUND, ISLET, WATER } from './config.js'
+import { BEACH, GROUND, ISLET, TOWN, WATER } from './config.js'
 import { RAPIER, addFixed } from './physics.js'
-import { mulberry32, paintCrackedSand, paintGrass, toTexture } from './textures.js'
-import { buildCliff, buildPalm, cliffCollider } from './propkit.js'
+import { mulberry32, paintDirt, paintGrass, toTexture } from './textures.js'
+import { buildOak } from './propkit.js'
+import { bake } from './bake.js'
 
-// The lobby ground: a pale cracked-sand slab in a grass meadow that runs to the
-// horizon (the race track crosses it), with green hills on the far left
-// horizon, a rocky islet with palms to the east, and puffy clouds in the sky.
-// The meadow and clouds are shared by every world (createWorld); the land is
-// built per world (buildBeachLand here, the City's in city.js, both through
-// buildSlab; environment.js shows one).
+// The lobby ground: the ranch's grass yard with packed-dirt areas, a slab just
+// proud of a grass meadow that runs to the horizon (the race track crosses it),
+// with green hills on the far left horizon, a wooded hill to the east, and
+// puffy clouds in the sky. The meadow and clouds are shared by every world
+// (createWorld); the land is built per world (buildRanchLand here, the Frontier
+// Town's in town.js, both through buildSlab; environment.js shows one).
 // Physically the land is one convex-hull collider plus an invisible fence on
 // every edge (landColliders, the same in every world).
 //
 // Texture techniques used here:
-//  - sand: tileable Voronoi cells + cracks -> colour + derived normal map,
-//    world-space UVs (ExtrudeGeometry caps use shape coordinates = metres)
+//  - yard: the grass painter (colour + bump) and the dirt painter, world-space
+//    UVs (ExtrudeGeometry caps and ShapeGeometry use shape coordinates = metres)
 //  - meadow: the grass painter's colour + bump, its v offset scrolled by a race
 
-// Beach outline in world (x, z), counter-clockwise seen from above. Convex.
+// The start island's outline in world (x, z), counter-clockwise seen from above. Convex.
 export function beachOutline() {
   const { front, back, halfWidth: W, wingZ, gateEdge } = BEACH
   return [
@@ -107,13 +107,12 @@ function makeClouds() {
   return group
 }
 
-// The slab of land the start island stands on (sand on the beach, paving in the City): `top` is
-// the material of its flat top, `side` the colour of its rounded edge, `shallow` the lighter
-// water band hugging it. Visual only (landColliders is shared by every world).
-export function buildSlab(root, top, side, shallow) {
-  const outline = beachOutline()
+// The slab of land the start island stands on (the ranch's grass, the Frontier Town's dirt):
+// `top` is the material of its flat top (UVs in metres), `side` the colour of its rounded edge.
+// Its top sits just over the meadow. Visual only (landColliders is shared by every world).
+export function buildSlab(root, top, side) {
   const bevel = 0.6
-  const slabGeo = new ExtrudeGeometry(outlineShape(outline), {
+  const slabGeo = new ExtrudeGeometry(outlineShape(beachOutline()), {
     depth: BEACH.depth,
     bevelEnabled: true,
     bevelThickness: bevel,
@@ -125,53 +124,68 @@ export function buildSlab(root, top, side, shallow) {
   const slab = new Mesh(slabGeo, [top, new MeshStandardMaterial({ color: side, roughness: 1 })])
   slab.position.y = -(BEACH.depth + bevel)
   slab.receiveShadow = true
-
-  // Shallow water: a lighter band just around the land.
-  const cz = (BEACH.front + BEACH.back) / 2
-  const shallowGeo = new ShapeGeometry(outlineShape(outline, 1.12, cz))
-  shallowGeo.rotateX(-Math.PI / 2)
-  const band = new Mesh(shallowGeo, new MeshStandardMaterial({ color: shallow, roughness: 0.3, transparent: true, opacity: 0.55, depthWrite: false }))
-  band.position.y = WATER.level + 0.04
-  band.renderOrder = 1
-  root.add(slab, band)
+  root.add(slab)
 }
 
-// The beach world's land: the cracked-sand slab, green hills on the far left
-// horizon and the rocky islet with its palms.
-export function buildBeachLand(root) {
-  // Sand slab: flat cracked top, rounded edge, darker wet sides.
-  const sand = paintCrackedSand()
-  const sandColor = toTexture(sand.color, { repeat: 1 / BEACH.tile, srgb: true })
-  const sandNormal = toTexture(sand.normal, { repeat: 1 / BEACH.tile })
-  const top = new MeshStandardMaterial({ map: sandColor, normalMap: sandNormal, normalScale: new Vector2(0.6, 0.6), roughness: 1, metalness: 0 })
-  buildSlab(root, top, '#dcc08a', WATER.shallow)
+// A rounded rectangle [x0, z0, x1, z1, r] as a Shape in outlineShape's (x, -z) space.
+function roundedRect([x0, z0, x1, z1, r]) {
+  const s = new Shape()
+  const [a, b, c, d] = [x0, -z1, x1, -z0] // shape-space min x, min y, max x, max y
+  s.moveTo(a + r, b)
+  s.lineTo(c - r, b)
+  s.quadraticCurveTo(c, b, c, b + r)
+  s.lineTo(c, d - r)
+  s.quadraticCurveTo(c, d, c - r, d)
+  s.lineTo(a + r, d)
+  s.quadraticCurveTo(a, d, a, d - r)
+  s.lineTo(a, b + r)
+  s.quadraticCurveTo(a, b, a + r, b)
+  return s
+}
 
-  // Far scenery: green islands on the left horizon, a hazy mountain behind them.
+// The ranch's land: a grass yard with packed-dirt areas (one mesh: overlapping patches share
+// world-space UVs, so they join seamlessly), green hills on the far left horizon and the wooded
+// hill to the east.
+export function buildRanchLand(root) {
+  const grass = paintGrass()
+  const top = new MeshStandardMaterial({
+    color: BEACH.grass,
+    map: toTexture(grass.color, { repeat: 1 / GROUND.tile, srgb: true }),
+    bumpMap: toTexture(grass.height, { repeat: 1 / GROUND.tile }),
+    bumpScale: 0.6,
+    roughness: 1,
+  })
+  buildSlab(root, top, BEACH.side)
+  const dirtGeo = new ShapeGeometry(BEACH.dirt.map(roundedRect), 6)
+  dirtGeo.rotateX(-Math.PI / 2)
+  const dirt = new Mesh(dirtGeo, new MeshStandardMaterial({ map: toTexture(paintDirt(), { repeat: 1 / BEACH.dirtTile, srgb: true }), roughness: 1 }))
+  dirt.position.y = 0.02
+  dirt.receiveShadow = true
+  root.add(dirt)
+
+  // Far scenery: green hills on the left horizon, a hazy mountain behind them.
   root.add(
     ...makeHill(-250, -300, 120, 30, 60, '#4dbb3c', 11),
     ...makeHill(-130, -360, 55, 18, 35, '#45ad37', 12),
     ...makeHill(-400, -470, 150, 60, 80, '#6f9fd6', 13),
   )
 
-  // The islet: a low green hill with a grass-capped rock and two palms on it.
+  // The hill out east, with oaks on it.
   const I = ISLET
-  const islet = new Group()
-  islet.position.set(I.x, 0, I.z)
-  root.add(islet, ...makeHill(I.x, I.z, I.hill.rx, I.hill.ry, I.hill.rz, '#4dbb3c', 14))
-  buildCliff(root, isletRock(), 5, WATER.level - 1, false)
-  const rockTop = WATER.level - 1 + I.rock[4]
-  buildPalm(islet, -4, -2, 11, -0.3, 0.1, 50, rockTop)
-  buildPalm(islet, 6, 3, 9, 0.2, -0.2, 51, rockTop)
+  root.add(...makeHill(I.x, I.z, I.hill.rx, I.hill.ry, I.hill.rz, '#4dbb3c', 14))
+  const oaks = new Group()
+  I.trees.forEach(([x, z, h], i) => buildOak(oaks, I.x + x, I.z + z, h, 50 + i, hillTop(x, z) - 0.4, false))
+  root.add(bake(oaks, true))
 }
 
-// The islet's rock (or the City's tower on it) in buildCliff's [x, z, w, d, h, yaw], world x / z.
-export function isletRock() {
-  const [rx, rz, ...rock] = ISLET.rock // offset from the islet centre
-  return [ISLET.x + rx, ISLET.z + rz, ...rock]
+// Height of the hill's surface (makeHill: a squashed dome sunk to WATER.level - 1) at (x, z) from
+// its centre, ignoring its bumps.
+export function hillTop(x, z) {
+  const { rx, ry, rz } = ISLET.hill
+  return WATER.level - 1 + ry * Math.sqrt(Math.max(0, 1 - (x / rx) ** 2 - (z / rz) ** 2))
 }
 
-// Collision for the land (every world): the slab as a convex hull, a fence along every edge
-// and the islet's rock.
+// Collision for the land (every world): the slab as a convex hull and a fence along every edge.
 export function landColliders() {
   const outline = beachOutline()
   const hull = []
@@ -188,31 +202,45 @@ export function landColliders() {
       { x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) },
     )
   }
-  cliffCollider(isletRock(), WATER.level - 1)
 }
 
-// What every world shares: the meadow (its tint set per world) and the clouds.
+// What every world shares: the ground out to the horizon (per world: the meadow's grass, or the
+// Frontier Town's desert sand; `setGround`) and the clouds.
 export function createWorld(scene) {
-  // Meadow: the grass painter (colour + bump), one tile every GROUND.tile m, to the horizon.
+  // One tile every GROUND.tile m. The grass also has a bump map; the sand is flat.
+  const tiled = (c) => toTexture(c, { repeat: GROUND.size / GROUND.tile, srgb: true })
   const grass = paintGrass()
-  const map = toTexture(grass.color, { repeat: GROUND.size / GROUND.tile, srgb: true })
-  const bump = toTexture(grass.height, { repeat: GROUND.size / GROUND.tile })
-  const meadow = new Mesh(
+  const skins = {
+    grass: { map: tiled(grass.color), bump: toTexture(grass.height, { repeat: GROUND.size / GROUND.tile }) },
+    sand: null, // painted the first time a world asks for it
+  }
+  const ground = new Mesh(
     new PlaneGeometry(GROUND.size, GROUND.size),
-    new MeshStandardMaterial({ color: GROUND.tint, map, bumpMap: bump, bumpScale: 0.6, roughness: 1, metalness: 0 }),
+    new MeshStandardMaterial({ color: GROUND.tint, map: skins.grass.map, bumpMap: skins.grass.bump, bumpScale: 0.6, roughness: 1, metalness: 0 }),
   )
-  meadow.rotation.x = -Math.PI / 2
-  meadow.position.y = GROUND.level
-  meadow.receiveShadow = true
-  scene.add(meadow, makeClouds())
+  ground.rotation.x = -Math.PI / 2
+  ground.position.y = GROUND.level
+  ground.receiveShadow = true
+  scene.add(ground, makeClouds())
+  let skin = skins.grass
 
   return {
-    setGroundColor: (color) => meadow.material.color.set(color),
+    // { texture: 'grass' | 'sand', tint } (WORLDS.list.*.ground).
+    setGround({ texture = 'grass', tint = GROUND.tint } = {}) {
+      if (texture === 'sand') skins.sand ||= { map: tiled(paintDirt(256, 909, ...TOWN.sand)), bump: null }
+      skin = skins[texture] ?? skins.grass
+      const m = ground.material
+      m.map = skin.map
+      m.bumpMap = skin.bump
+      m.color.set(tint)
+      m.needsUpdate = true
+    },
     // m the world has slid toward +Z (a race past RACE.cruiseZ moves the world, not the horse).
     // Wrapped to one tile: a 2 h race scrolls ~875 km, too far for a float32 offset.
     setScroll(m) {
       const v = (m / GROUND.tile) % 1
-      map.offset.y = bump.offset.y = v
+      skin.map.offset.y = v
+      if (skin.bump) skin.bump.offset.y = v
     },
   }
 }

@@ -1,7 +1,7 @@
-// Worlds: the VIP portal on the plaza takes the player between the beach and the
-// City (WORLDS in config). Both are the same start island with the same shops,
-// lanes, races and progress; only the scenery, sea and sky change (environment.js,
-// city.js, lighting.setMoods). Driving into the portal (a circle in front of its
+// Worlds: the VIP portal on the plaza takes the player between the ranch and the
+// Frontier Town (WORLDS in config; ids `beach` and `city`, as saved). Both are the
+// same start island with the same shops, tracks, races and progress; only the
+// scenery, meadow tint and sky change (environment.js, town.js, lighting.setMoods). Driving into the portal (a circle in front of its
 // dais, so it works the same on touch) goes to the other world when it is open:
 // a world with `req` opens once the player has that many rebirths and that much
 // Power (lightning) at once, and from then on stays open (saved: `worldsUnlocked`);
@@ -22,7 +22,7 @@ const IDS = Object.keys(WORLDS.list)
 const OK = '#7dff6a'
 const MISSING = '#ff6b6b'
 
-// deps: { hud (root), plaza (setPortal), env (show), world (setGroundColor), lighting (setMoods),
+// deps: { hud (root), plaza (setPortal), env (show), world (setGround), lighting (setMoods),
 //   stats() -> { rebirths, power }, leave() (end a race / the Trails scene first), respawn() }
 export function createWorlds(deps) {
   const { hud, plaza, env, world, lighting } = deps
@@ -74,7 +74,7 @@ export function createWorlds(deps) {
     worldState.current = id
     const def = WORLDS.list[id]
     env.show(id)
-    world.setGroundColor(def.ground)
+    world.setGround(def.ground)
     lighting.setMoods(def.sky)
     refreshSign()
   }

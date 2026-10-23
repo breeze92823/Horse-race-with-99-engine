@@ -267,8 +267,9 @@ export function paintTiles(size = 512, perSide = 4) {
   return { color, normal: heightToNormal(heights, size, 2.5), roughness: fieldCanvas(rough, size) }
 }
 
-// Wood planks running along U: per-plank tint, wavy grain, dark seams.
-export function paintPlanks(size = 512, planks = 6, seed = 9) {
+// Wood planks running along U: per-plank tint, wavy grain, dark seams. `base` = the wood colour.
+export function paintPlanks(size = 512, planks = 6, seed = 9, base = '#a87042') {
+  const [br, bg, bb] = hexRgb(base)
   const rand = mulberry32(seed)
   const warp = fbm(size, 4, 3, seed + 1)
   const plankH = size / planks
@@ -287,9 +288,9 @@ export function paintPlanks(size = 512, planks = 6, seed = 9) {
       const grain = 0.5 + 0.5 * Math.sin((y + warp[i] * 30) * 0.9 + offsets[row] + Math.sin(x * 0.02 + row) * 2)
       const shade = seam ? 0.35 : tints[row] * (0.78 + grain * 0.22)
       heights[i] = seam ? 0 : 0.7 + grain * 0.08
-      img.data[i * 4] = 168 * shade
-      img.data[i * 4 + 1] = 112 * shade
-      img.data[i * 4 + 2] = 66 * shade
+      img.data[i * 4] = br * shade
+      img.data[i * 4 + 1] = bg * shade
+      img.data[i * 4 + 2] = bb * shade
       img.data[i * 4 + 3] = 255
     }
   }
@@ -733,22 +734,21 @@ export function paintChecker(a = '#ff5fa8', b = '#ff7fbc', size = 64) {
   return c
 }
 
-// Dirt track: warm brown fbm, raked furrows running down the track (canvas y = along the
-// track), pebbles and scattered hoof prints. Tileable both ways.
-export function paintDirt(size = 256, seed = 808) {
+// Dirt track: warm brown fbm (from `lo` to `hi`), raked furrows running down the track (canvas
+// y = along the track), pebbles and scattered hoof prints. Tileable both ways.
+export function paintDirt(size = 256, seed = 808, lo = '#9a6a3e', hi = '#c99662') {
   const rand = mulberry32(seed)
   const field = fbm(size, 6, 4, seed)
   const c = canvas(size)
   const ctx = c.getContext('2d')
   const img = ctx.createImageData(size, size)
-  const lo = hexRgb('#9a6a3e')
-  const hi = hexRgb('#c99662')
+  const [loC, hiC] = [hexRgb(lo), hexRgb(hi)]
   for (let i = 0; i < size * size; i++) {
     const x = i % size
     // Furrows: a soft ridge every size/16 px across the track.
     const furrow = 0.5 + 0.5 * Math.sin((x / size) * Math.PI * 2 * 16)
     const t = Math.min(1, Math.max(0, field[i] * 1.2 - 0.1 + furrow * 0.12))
-    for (let k = 0; k < 3; k++) img.data[i * 4 + k] = lo[k] + (hi[k] - lo[k]) * t
+    for (let k = 0; k < 3; k++) img.data[i * 4 + k] = loC[k] + (hiC[k] - loC[k]) * t
     img.data[i * 4 + 3] = 255
   }
   ctx.putImageData(img, 0, 0)
@@ -762,7 +762,7 @@ export function paintDirt(size = 256, seed = 808) {
     const y = rand() * size
     const r = size * (0.012 + rand() * 0.008)
     wrapped(x, y, r * 2, (px, py) => {
-      ctx.strokeStyle = 'rgba(70,42,20,0.45)'
+      ctx.strokeStyle = 'rgba(70,42,20,0.28)'
       ctx.lineWidth = r * 0.7
       ctx.beginPath()
       ctx.arc(px, py, r, Math.PI * 0.15, Math.PI * 0.85, true)

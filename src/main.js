@@ -461,6 +461,7 @@ renderer.setAnimationLoop(() => {
   hud.update()
   updateParticles(elapsed, renderer.domElement.height)
   lobby.update(dt, elapsed)
+  env.update(elapsed)
   plaza.update(dt, elapsed)
   shops.update(dt, elapsed)
   lighting.update(dt, playerGroup.position)

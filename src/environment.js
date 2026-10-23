@@ -1,35 +1,41 @@
 import { Group } from 'three'
 import { LOBBY, PLAZA, WORLDS } from './config.js'
-import { buildBeachLand, landColliders } from './world.js'
-import { buildCity } from './city.js'
-import { buildCliff, buildPalm, buildUmbrella, cliffCollider, palmCollider, solidPole } from './propkit.js'
+import { buildRanchLand, landColliders } from './world.js'
+import { buildTown } from './town.js'
+import { bake } from './bake.js'
+import { buildCliff, buildOak, buildWindPump, cliffCollider, solidPole, treeCollider } from './propkit.js'
 
 // The start island's scenery, one look per world (WORLDS): the land, the far horizon,
-// the cliffs ringing the plaza, the trees, the umbrella and the islet. Every look stands
+// the cliffs ringing the plaza, the trees, the wind pump and the hill. Every look stands
 // on the same footprints, so the colliders are added once here and the looks themselves
-// are visual only. A world's look is built the first time it is shown (the City is
-// never built for a player who stays on the beach); show() swaps which one is visible.
+// are visual only. A world's look is built the first time it is shown (the Frontier Town
+// is never built for a player who stays on the ranch); show() swaps which one is visible.
 // Each look is one Group under the scene, so a race slides it away with the rest of the
 // start island (main.js puts it in `home`).
 
-// The beach: cracked sand, green hills, grass-capped cliffs with palms, the striped umbrella.
-function buildBeach(root) {
-  buildBeachLand(root)
-  PLAZA.cliffs.forEach((c, i) => buildCliff(root, c, 20 + i * 7, 0, false))
-  PLAZA.palms.forEach(([x, z, y, h, lx, lz], i) => buildPalm(root, x, z, h, lx, lz, 300 + i, y, false))
-  LOBBY.palms.forEach(([x, z, h, lx, lz], i) => buildPalm(root, x, z, h, lx, lz, 100 + i, 0, false))
-  buildUmbrella(root, LOBBY.umbrella, ['#e3262e', '#ffffff'])
+// The ranch: the grass yard with dirt areas, green hills, grass-capped cliffs with oaks, the
+// wind pump. Returns its per-frame update (the pump's wheel).
+function buildRanch(root) {
+  buildRanchLand(root)
+  // Cliffs and oaks merged to a few meshes per material (dozens of trees: mobile draw calls).
+  const props = new Group()
+  PLAZA.cliffs.forEach((c, i) => buildCliff(props, c, 20 + i * 7, 0, false))
+  PLAZA.trees.forEach(([x, z, y, h], i) => buildOak(props, x, z, h, 300 + i, y, false))
+  LOBBY.trees.forEach(([x, z, h], i) => buildOak(props, x, z, h, 100 + i, 0, false))
+  root.add(bake(props, true))
+  const wheel = buildWindPump(root, LOBBY.pump)
+  return (t) => (wheel.rotation.z = t * 2.2)
 }
 
-const BUILDERS = { beach: buildBeach, city: buildCity }
+const BUILDERS = { beach: buildRanch, city: buildTown }
 
 function addColliders() {
   landColliders()
   PLAZA.cliffs.forEach((c) => cliffCollider(c))
-  for (const [x, z, y, h] of PLAZA.palms) if (y === 0) palmCollider(x, z, h)
-  for (const [x, z, h] of LOBBY.palms) palmCollider(x, z, h)
-  const U = LOBBY.umbrella
-  solidPole(0.3 * U.scale, 3, U.x, U.z)
+  for (const [x, z, y, h] of PLAZA.trees) if (y === 0) treeCollider(x, z, h)
+  for (const [x, z, h] of LOBBY.trees) treeCollider(x, z, h)
+  const P = LOBBY.pump
+  solidPole(0.6 * P.scale, 3, P.x, P.z)
 }
 
 export function createEnvironment(scene) {
@@ -40,7 +46,7 @@ export function createEnvironment(scene) {
     root.name = `scenery-${id}`
     root.visible = false
     scene.add(root)
-    looks[id] = { root, built: false }
+    looks[id] = { root, built: false, update: null }
   }
   let shown = null
   return {
@@ -51,10 +57,15 @@ export function createEnvironment(scene) {
       const look = looks[id] ?? looks[WORLDS.start]
       if (!look.built) {
         look.built = true
-        BUILDERS[id]?.(look.root)
+        look.update = BUILDERS[id]?.(look.root) ?? null
       }
       for (const l of Object.values(looks)) l.root.visible = l === look
       shown = id
+    },
+    // The shown look's animation (wind pump, lamps...), if it has any.
+    update(elapsed) {
+      const look = looks[shown]
+      if (look?.root.visible) look.update?.(elapsed)
     },
   }
 }
