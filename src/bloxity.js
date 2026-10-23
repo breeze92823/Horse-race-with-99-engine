@@ -158,6 +158,9 @@ export function init() {
     SDK.settings.triggerAll?.()
 
     unsubscribers.push(SDK.auth.onUserChanged(onUser))
+    // No callback at all (portal handshake blocked or slow): settle as a guest anyway, or net.js
+    // never connects and no other player is ever seen.
+    if (!settleTimer) settleTimer = setTimeout(settleAuth, GUEST_SETTLE_MS * 2)
 
     if (typeof SDK.avatar?.onAvatarChanged === 'function') {
       unsubscribers.push(
