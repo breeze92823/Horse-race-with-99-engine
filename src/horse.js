@@ -101,7 +101,9 @@ function stride(p, duty) {
 // sparks, no shadows, and the engines' static parts baked to one mesh per material (only the flames
 // stay apart: they flicker), so a horse with 8 engines costs a handful of draw calls instead of
 // ~60. engines = false: no boosters at all (display horses).
-export function createHorse({ lite = false, engines: withEngines = true } = {}) {
+// onFootfall(leg, speed, gait): called as each hoof lands (leg: a LEGS entry, gait: 0 walk, 1 trot,
+// 2 gallop, the dominant one), from the same phase that poses the legs, so hoofbeats match what is seen.
+export function createHorse({ lite = false, engines: withEngines = true, onFootfall = null } = {}) {
   const D = HORSE.dims
   const root = new Group() // follows the player; `frame` inside it carries the look's size
   const frame = new Group()
@@ -308,8 +310,15 @@ export function createHorse({ lite = false, engines: withEngines = true } = {}) 
       for (let g = 0; g < 3; g++) strideLength += weights[g] * G[GAITS[g]].stride
       phase = (phase + clamp(speed / (strideLength * size), G.minRate, G.maxRate) * moving * dt) % 1
       air += ((grounded ? 0 : 1) - air) * (1 - Math.exp(-12 * dt))
+      const lead = weights[2] >= weights[1] && weights[2] >= weights[0] ? 2 : weights[1] >= weights[0] ? 1 : 0
 
       for (const leg of legs) {
+        // A hoof lands when its place in the leading gait's cycle wraps back to 0 (stance starts).
+        if (onFootfall) {
+          const p = (phase + leg.offset[lead]) % 1
+          if (leg.lastP > 0.5 && p < 0.5 && moving > 0.3 && air < 0.5) onFootfall(leg, speed, lead)
+          leg.lastP = p
+        }
         let swing = 0
         let flex = 0
         for (let g = 0; g < 3; g++) {

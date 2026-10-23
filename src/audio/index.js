@@ -1,19 +1,21 @@
 // Game audio, the one import the rest of the game uses:
 //   import { sfx, installAudio, updateAudio } from './audio/index.js'
 // installAudio() once at boot (waits for the first gesture to start), then
-// updateAudio(dt, state) every frame for the engine, hull and ambience, and
-// sfx.<name>() for one-shots. Every button press anywhere gets its click here
+// updateAudio(dt, state) every frame for the horse (hooves, breath, boosters) and
+// the ambience, hoofbeat() from the horse as each hoof lands, and sfx.<name>()
+// for one-shots. Every button press anywhere gets its click here
 // (one capture-phase listener), so menus need no wiring of their own; the
 // result sounds (buy, deny, equip) come from uiWindow.replay and hud.setStat.
-import { BEACH } from '../config.js'
 import { A, installAudio as installCore, onStart, setDucked, setMuted, setVolume, isMuted, toggleMuted } from './core.js'
 import * as sfx from './sfx.js'
-import * as engine from './engine.js'
+import * as mount from './mount.js'
 import * as ambience from './ambience.js'
 
 export { sfx, setVolume, setMuted, isMuted, toggleMuted }
-export const engineBlip = engine.blip
-export const engineRev = engine.rev
+export const engineBlip = mount.blip
+export const engineRev = mount.rev
+// horse.js onFootfall: one hoof landing (only the player's horse is heard).
+export const hoofbeat = mount.hoof
 
 let racing = false
 // Presses on anything clickable: chunky menu buttons, grid cards, HUD buttons, touch buttons.
@@ -56,17 +58,14 @@ export function feedback(kind, el) {
 // Per-frame state from main.js:
 // { camera, player: { x, y, z, vy, grounded }, speed (m/s), top (m/s), boost, moving (0..1),
 //   racing, staging, windowOpen, night }
-const prev = { x: 0, y: 0, z: 0, grounded: true, vy: 0, onWater: false, init: false }
+const prev = { x: 0, y: 0, z: 0, grounded: true, vy: 0, init: false }
 let started = false
 onStart(() => (started = true))
 export function updateAudio(dt, st) {
   racing = st.racing
   if (!started || !A.ctx || A.ctx.state !== 'running') return
   const p = st.player
-  const onWater = st.racing ? p.z < BEACH.front : false
   if (prev.init) {
-    // The boat leaves the pad and slams into the sea.
-    if (onWater && !prev.onWater) sfx.splash(1.3)
     if (!st.racing && !st.staging) {
       if (prev.grounded && !p.grounded && p.vy > 2) sfx.jump()
       if (!prev.grounded && p.grounded && prev.vy < -3) sfx.land(Math.min(1, -prev.vy / 18))
@@ -78,19 +77,17 @@ export function updateAudio(dt, st) {
   prev.z = p.z
   prev.grounded = p.grounded
   prev.vy = p.vy
-  prev.onWater = onWater
   prev.init = true
 
   setDucked(st.windowOpen)
   const e = st.camera.matrixWorld.elements // camera right vector = first column
   const rl = Math.hypot(e[0], e[2]) || 1
-  engine.update(dt, {
+  mount.update(dt, {
     speed: st.speed,
     top: st.top,
     boost: st.boost,
     moving: st.moving,
     racing: st.racing,
-    onWater: onWater || st.staging,
     visible: st.visible,
   })
   ambience.update(dt, {
@@ -99,6 +96,7 @@ export function updateAudio(dt, st) {
     rightX: e[0] / rl,
     rightZ: e[2] / rl,
     racing: st.racing,
+    speed: st.speed,
     night: st.night,
   })
 }

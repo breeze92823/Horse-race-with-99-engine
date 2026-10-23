@@ -1,33 +1,34 @@
-// The beach around the player, all synthesised:
-//  - surf: each wave builds (the wash swells and brightens), breaks (a crash of
-//    pink noise and a low thump), then runs back up the sand fizzing with tiny
-//    foam bubbles; waves come every 6-12 s, louder the closer you are to the
-//    shoreline (north, -Z) and panned to where the sea is from the camera
-//  - the waterfall in the plaza: a positional roar (rumble + hiss) that grows as you drive toward it
-//  - distant gulls by day, crickets at night
-// One scheduler tick (every AUDIO.ambience.tick s) plans the next events ahead of
-// the clock; update() moves the continuous levels every frame.
-import { AUDIO, BEACH, COARSE_POINTER, PLAZA } from '../config.js'
+// The countryside around the player, all synthesised:
+//  - wind over the meadow: a soft stereo bed that gusts (every few seconds a swell that opens
+//    up brighter), with the grass rustling in the gusts; racing, the rush of air grows with speed
+//  - songbirds by day: quick phrases of chirps, sweeps and trills, near and far, either side
+//  - a distant crowd from the grandstands: a murmur that swells into a cheer now and then while
+//    racing, faint in the lobby (louder toward the START gate)
+//  - the waterfall in the plaza: a positional roar (rumble + hiss) that grows as you ride toward it
+//  - crickets at night
+// One scheduler tick (every AUDIO.ambience.tick s) plans the next events ahead of the clock;
+// update() moves the continuous levels every frame.
+import { AUDIO, LOBBY, PLAZA } from '../config.js'
 import { A, onStart, ready } from './core.js'
-import { bubble, burst, env, rnd, route } from './synth.js'
+import { env, rnd, route } from './synth.js'
 
 const M = AUDIO.ambience
 const s = {
   ok: false,
-  wave: null, // wash gain (wave envelope) + its filter
-  waveFilter: null,
-  shore: null, // proximity x pan for the surf
-  shorePan: null,
-  fizz: null,
+  wind: null, // gust envelope gain + its filter
+  windFilter: null,
+  windLevel: null, // speed / racing level
+  rustle: null,
+  crowd: null, // swell envelope
+  crowdLevel: null, // racing / distance level
   fall: null, // waterfall level + pan
   fallPan: null,
-  nextWave: 0,
-  nextGull: 0,
+  nextGust: 0,
+  nextBird: 0,
+  nextCheer: 0,
   crickets: [],
   night: false,
   racing: false,
-  shoreK: 0.5, // 0..1 how close to the surf
-  shoreSide: 0, // -1..1 where the sea is, from the camera
 }
 
 const filt = (type, f, q = 0.7) => {
@@ -52,22 +53,27 @@ function loop(buf) {
 
 onStart((ctx) => {
   const bus = A.amb
-  // Surf chain: stereo pink -> lowpass (opens as a wave builds) -> wave envelope -> proximity -> pan.
-  s.shorePan = ctx.createStereoPanner()
-  s.shore = gain(0.5)
-  s.shore.connect(s.shorePan).connect(bus)
-  s.waveFilter = filt('lowpass', 400, 0.5)
-  s.wave = gain(0.12)
-  loop(A.noise.pinkStereo).connect(s.waveFilter).connect(s.wave).connect(gain(0.0025)).connect(s.shore) // 0.0025 = wash trim
-  // Fizz: the receding foam, a high hiss under the bubbles.
-  s.fizz = gain(0)
-  loop(A.noise.pinkStereo).connect(filt('highpass', 3000, 0.5)).connect(s.fizz).connect(s.shore)
+  // Wind: stereo pink -> band (opens in a gust) -> gust envelope -> level.
+  s.windLevel = gain(0)
+  s.windLevel.connect(bus)
+  s.windFilter = filt('bandpass', 420, 0.45)
+  s.wind = gain(0.4)
+  loop(A.noise.pinkStereo).connect(s.windFilter).connect(s.wind).connect(s.windLevel)
+  // Grass rustle: a high, grainy hiss that only comes up in the gusts.
+  s.rustle = gain(0)
+  loop(A.noise.pinkStereo).connect(filt('highpass', 3200, 0.5)).connect(s.rustle).connect(s.windLevel)
+  // Crowd: a murmur of many voices (two formant-ish bands of pink noise), swelling into cheers.
+  s.crowdLevel = gain(0)
+  s.crowdLevel.connect(bus)
+  s.crowd = gain(0.5)
+  s.crowd.connect(s.crowdLevel)
+  loop(A.noise.pinkStereo).connect(filt('bandpass', 650, 0.9)).connect(gain(1)).connect(s.crowd)
+  loop(A.noise.pinkStereo).connect(filt('bandpass', 1700, 1.4)).connect(gain(0.5)).connect(s.crowd)
   // Waterfall: a heavy rumble + broadband hiss, positional.
   s.fallPan = ctx.createStereoPanner()
   s.fall = gain(0)
   s.fall.connect(s.fallPan).connect(bus)
-  const roar = filt('bandpass', 1100, 0.35)
-  loop(A.noise.pinkStereo).connect(roar).connect(gain(0.9)).connect(s.fall)
+  loop(A.noise.pinkStereo).connect(filt('bandpass', 1100, 0.35)).connect(gain(0.9)).connect(s.fall)
   loop(A.noise.brownStereo).connect(filt('lowpass', 220, 0.6)).connect(gain(1.2)).connect(s.fall)
   // Night crickets: each is a sine whose gain is pulsed into chirps by the scheduler.
   for (const [f, pan] of M.crickets) {
@@ -79,82 +85,70 @@ onStart((ctx) => {
     o.start()
     s.crickets.push({ g, next: 0, rate: rnd(0.55, 0.9) })
   }
-  s.nextWave = ctx.currentTime + 1
-  s.nextGull = ctx.currentTime + rnd(4, 10)
+  s.nextGust = ctx.currentTime + 1
+  s.nextBird = ctx.currentTime + rnd(2, 5)
+  s.nextCheer = ctx.currentTime + rnd(...M.cheerEvery)
   s.ok = true
   setInterval(schedule, M.tick * 1000)
 })
 
-// One wave: build, break, run back up the sand.
-function wave(t) {
-  const build = rnd(1.8, 3)
-  const back = rnd(3, 4.5)
-  const peak = rnd(0.5, 0.75)
-  const crash = t + build
-  const g = s.wave.gain
-  const f = s.waveFilter.frequency
+// One gust: the wind swells and brightens, the grass rustles, then it all dies back.
+function gust(t) {
+  const rise = rnd(1.2, 2.5)
+  const fall = rnd(2, 4)
+  const peak = rnd(0.7, 1)
+  const g = s.wind.gain
+  const f = s.windFilter.frequency
   g.cancelScheduledValues(t)
   f.cancelScheduledValues(t)
   g.setValueAtTime(g.value, t)
   f.setValueAtTime(f.value, t)
-  g.linearRampToValueAtTime(peak * 0.6, crash - 0.25)
-  f.exponentialRampToValueAtTime(1300, crash - 0.25)
-  g.linearRampToValueAtTime(peak, crash + 0.15)
-  f.exponentialRampToValueAtTime(2600, crash + 0.15)
-  g.linearRampToValueAtTime(0.12, crash + back)
-  f.exponentialRampToValueAtTime(420, crash + back)
-  // The break itself.
-  const k = rnd(0.6, 1)
-  burst({ t: crash - 0.05, noise: 'pink', f: 900, f2: 500, q: 0.5, a: 0.12, d: 1.4, gain: 0.35 * k, bus: s.shore })
-  burst({ t: crash, noise: 'brown', type: 'lowpass', f: 260, q: 0.6, a: 0.05, d: 0.9, gain: 0.45 * k, bus: s.shore })
-  // Foam fizzing as it runs back: hiss + sparse tiny bubbles.
-  s.fizz.gain.cancelScheduledValues(crash + 0.2)
-  env(s.fizz.gain, crash + 0.2, 0.5, 0.18 * k, back - 0.5)
-  const n = Math.round(back * (COARSE_POINTER ? M.foamTouch : M.foam))
-  for (let i = 0; i < n; i++) {
-    const at = crash + 0.3 + Math.pow(Math.random(), 1.4) * back
-    bubble({ t: at, f: rnd(2200, 6500), d: rnd(0.006, 0.02), gain: rnd(0.008, 0.025) * k, rise: rnd(0.2, 0.6), pan: rnd(-0.8, 0.8), bus: s.shore })
-  }
-  return crash + back * rnd(0.55, 0.9) // next wave starts while this one is still running back
+  g.linearRampToValueAtTime(peak, t + rise)
+  f.exponentialRampToValueAtTime(rnd(750, 1100), t + rise)
+  g.linearRampToValueAtTime(rnd(0.3, 0.45), t + rise + fall)
+  f.exponentialRampToValueAtTime(rnd(360, 460), t + rise + fall)
+  s.rustle.gain.cancelScheduledValues(t)
+  env(s.rustle.gain, t + rise * 0.5, rise * 0.5, M.rustle * peak, fall)
+  return t + rise + fall * rnd(0.4, 1.2)
 }
 
-// A herring gull's call far off: a few "kyow"s, each a raspy rise and fall through a nasal formant.
-function gull(t) {
+// A songbird's phrase: a few chirps, sweeps and a trill, quick and high.
+function bird(t) {
   const ctx = A.ctx
-  const pan = rnd(-0.9, 0.9)
-  const out = gain(rnd(0.5, 1) * M.gull)
-  route(out, { bus: A.amb, pan, verb: 0.5 })
-  const lp = filt('lowpass', 3800, 0.5) // distance takes the edge off
-  lp.connect(out)
-  const notes = 2 + Math.floor(Math.random() * 4)
+  const near = Math.random() < 0.4
+  const out = gain((near ? 1 : 0.45) * M.bird * rnd(0.7, 1))
+  route(out, { bus: A.amb, pan: rnd(-0.9, 0.9), verb: near ? 0.25 : 0.5 })
+  const notes = 3 + Math.floor(Math.random() * 6)
+  const base = rnd(2600, 4200)
   let at = t
-  const base = rnd(1000, 1250)
+  const trillAt = Math.floor(Math.random() * notes)
   for (let i = 0; i < notes; i++) {
-    const len = rnd(0.22, 0.34)
-    const f0 = base * (1 - i * 0.03)
-    const o = ctx.createOscillator()
-    o.type = 'sawtooth'
-    o.frequency.setValueAtTime(f0, at)
-    o.frequency.exponentialRampToValueAtTime(f0 * 1.45, at + len * 0.3)
-    o.frequency.exponentialRampToValueAtTime(f0 * 0.85, at + len)
-    const rasp = ctx.createOscillator() // throat roughness
-    rasp.frequency.value = rnd(55, 80)
-    const raspDepth = gain(0.4)
-    const amp = gain(1)
-    rasp.connect(raspDepth).connect(amp.gain)
-    const f1 = filt('bandpass', 2300, 3)
-    const f2 = filt('bandpass', 1300, 4)
-    const g = gain(0)
-    o.connect(f1).connect(amp)
-    o.connect(f2).connect(amp)
-    amp.connect(g).connect(lp)
-    env(g.gain, at, 0.03, 1, len - 0.03, 0)
-    o.start(at)
-    o.stop(at + len + 0.05)
-    rasp.start(at)
-    rasp.stop(at + len + 0.05)
-    at += len + rnd(0.08, 0.16)
+    const trill = i === trillAt
+    const reps = trill ? 4 + Math.floor(Math.random() * 5) : 1
+    for (let r = 0; r < reps; r++) {
+      const len = trill ? 0.035 : rnd(0.05, 0.13)
+      const f0 = base * rnd(0.85, 1.25)
+      const o = ctx.createOscillator()
+      o.frequency.setValueAtTime(f0, at)
+      // Sweeps up or down; a trill is the same tiny chirp repeated fast.
+      o.frequency.exponentialRampToValueAtTime(f0 * (trill ? 1.3 : Math.random() < 0.5 ? rnd(1.2, 1.6) : rnd(0.6, 0.8)), at + len)
+      const g = gain(0)
+      env(g.gain, at, 0.008, 1, len - 0.008)
+      o.connect(g).connect(out)
+      o.start(at)
+      o.stop(at + len + 0.02)
+      at += len + (trill ? 0.02 : rnd(0.04, 0.12))
+    }
   }
+}
+
+// The crowd swells into a cheer and settles back.
+function cheer(t) {
+  const g = s.crowd.gain
+  g.cancelScheduledValues(t)
+  g.setValueAtTime(g.value, t)
+  g.linearRampToValueAtTime(rnd(1.3, 1.8), t + rnd(0.4, 0.8))
+  g.linearRampToValueAtTime(0.5, t + rnd(2.5, 4))
 }
 
 // One cricket chirp: 3-5 pulses ~35 ms apart.
@@ -173,10 +167,14 @@ function schedule() {
   if (!s.ok || !ready()) return
   const t = A.ctx.currentTime
   const ahead = t + M.tick * 1.5
-  if (s.nextWave < ahead) s.nextWave = wave(Math.max(t, s.nextWave))
-  if (!s.night && !s.racing && s.nextGull < ahead) {
-    gull(Math.max(t, s.nextGull))
-    s.nextGull = t + rnd(...M.gullEvery)
+  if (s.nextGust < ahead) s.nextGust = gust(Math.max(t, s.nextGust))
+  if (!s.night && s.nextBird < ahead) {
+    bird(Math.max(t, s.nextBird))
+    s.nextBird = t + rnd(...(s.racing ? M.birdEveryRacing : M.birdEvery))
+  }
+  if (s.racing && s.nextCheer < ahead) {
+    cheer(Math.max(t, s.nextCheer))
+    s.nextCheer = t + rnd(...M.cheerEvery)
   }
   if (s.night) {
     for (const c of s.crickets) {
@@ -190,17 +188,18 @@ function schedule() {
 }
 
 // listener: { x, z, rightX, rightZ } (camera position + its right vector on the ground);
-// racing; night.
+// racing; speed (m/s); night.
 export function update(dt, st) {
   if (!s.ok) return
   const t = A.ctx.currentTime
   s.night = st.night
   s.racing = st.racing
-  // Surf: close to the shoreline is loud; the sea is north (-Z) and, racing, all around.
-  const near = st.racing ? 0.35 : Math.max(0.3, Math.min(1, 1 - (st.z - BEACH.front) / 110))
-  const side = st.racing ? 0 : -st.rightZ // pan of the -Z direction
-  s.shore.gain.setTargetAtTime(near, t, 0.4)
-  s.shorePan.pan.setTargetAtTime(Math.max(-0.7, Math.min(0.7, side * 0.7)), t, 0.2)
+  // Wind: a steady breeze, rushing harder the faster the race goes.
+  const rush = st.racing ? Math.min(1, st.speed / 60) : 0
+  s.windLevel.gain.setTargetAtTime(M.wind * (1 + rush * M.rush), t, 0.4)
+  // Crowd: all around while racing; in the lobby faint, louder toward the START gate.
+  const toGate = Math.max(0, Math.min(1, 1 - (st.z - LOBBY.gate.z) / 90))
+  s.crowdLevel.gain.setTargetAtTime(M.crowd * (st.racing ? 1 : M.crowdLobby * (0.3 + 0.7 * toGate)), t, 0.6)
   // Waterfall: inverse-distance with a floor so it never pops in; panned from the camera.
   const W = PLAZA.waterfall
   const dx = W.x - st.x

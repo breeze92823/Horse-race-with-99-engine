@@ -1168,13 +1168,31 @@ export const AUDIO = {
   // Generated impulse response: pre-delay s, early reflections [ms, gain], tail decay s (to -60 dB),
   // tail level, how fast the tail darkens, and the default send level.
   reverb: { seconds: 1.8, preDelay: 0.012, early: [[19, 0.5], [31, 0.35], [47, 0.28], [73, 0.2], [97, 0.12]], decay: 1.4, tail: 0.18, darken: 1.6, send: 0.9 },
-  // The boat (audio/engine.js): rpm at idle / flat out, layer levels; idleLevel = mix level standing
-  // still in the lobby, settle = racing level once the speed is steady, eased to over settleTime s.
-  engine: { idle: 720, max: 4800, motor: 0.45, roar: 0.2, rumble: 0.1, wash: 0, spray: 0, slap: 0.2, sand: 0.06, idleLevel: 0.3, settle: 0.62, settleTime: 4 },
-  // The beach (audio/ambience.js): scheduler tick s, layer levels, foam bubbles per second of a
-  // receding wave, gull call gap range s, crickets [Hz, pan], waterfall level and the distance (m)
-  // at which it is at half level.
-  ambience: { tick: 0.25, foam: 16, foamTouch: 7, gull: 0.05, gullEvery: [14, 34], cricket: 0.025, crickets: [[4400, -0.6], [4750, 0.5], [5100, 0.1]], waterfall: 0.55, waterfallNear: 16 },
+  // The horse (audio/mount.js): booster roar / rumble levels; hooves = the hoofbeats' and breaths'
+  // level, thud / clop / crunch / breath / snort = their parts; snortEvery = s between snorts standing
+  // still; idleLevel = the boosters' mix level standing still in the lobby, settle = racing level
+  // once the speed is steady, eased to over settleTime s.
+  mount: { roar: 0.2, rumble: 0.1, hooves: 0.9, thud: 0.3, clop: 0.22, crunch: 0.12, breath: 0.32, snort: 0.9, snortEvery: [7, 16], idleLevel: 0.3, settle: 0.62, settleTime: 4 },
+  // The countryside (audio/ambience.js): scheduler tick s; wind level and how much a race's rush of
+  // air adds; grass rustle in the gusts; bird level and the gap range s (fewer while racing); crowd
+  // level (racing), its lobby share and the gap range s between cheers while racing; crickets [Hz,
+  // pan] and their level; waterfall level and the distance (m) at which it is at half level.
+  ambience: {
+    tick: 0.25,
+    wind: 0.035,
+    rush: 5,
+    rustle: 0.025,
+    bird: 0.035,
+    birdEvery: [3, 9],
+    birdEveryRacing: [8, 18],
+    crowd: 0.06,
+    crowdLobby: 0.12,
+    cheerEvery: [12, 28],
+    cricket: 0.025,
+    crickets: [[4400, -0.6], [4750, 0.5], [5100, 0.1]],
+    waterfall: 0.55,
+    waterfallNear: 16,
+  },
 }
 
 // --- UI juice (juice.js) -------------------------------------------------------------

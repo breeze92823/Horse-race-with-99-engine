@@ -6,7 +6,7 @@ import { inputState, install as installInput, onKey } from './input.js'
 import { installTouch } from './touch.js'
 import { createHud } from './hud.js'
 import { anyWindowOpen, closeTopWindow, setWindowReserved } from './uiWindow.js'
-import { installAudio, setVolume, sfx, toggleMuted, updateAudio } from './audio/index.js'
+import { hoofbeat, installAudio, setVolume, sfx, toggleMuted, updateAudio } from './audio/index.js'
 import { createRebirth } from './rebirth.js'
 import { createPets, petsState } from './pets.js'
 import { createEngine, ENGINES, engineState } from './engine.js'
@@ -126,7 +126,7 @@ syncYawToPlayer()
 // horse (horse.js), which carries it around the lobby.
 const playerGroup = new Group()
 scene.add(playerGroup)
-const horse = createHorse()
+const horse = createHorse({ onFootfall: hoofbeat })
 playerGroup.add(horse.root)
 const trail = createTrail(scene, horse.root) // the equipped trail, streaming off behind the horse
 let avatar = null

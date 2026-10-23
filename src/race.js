@@ -126,7 +126,7 @@ export function createRace({ scene, hud, lobby, world, home, onEnd }) {
     s.boostTap = Math.min(RACE.tap.max, s.boostTap + RACE.tap.perTap)
     if (x !== undefined) ui.tapAt(x, y)
     engineBlip()
-    sfx.tapSpray()
+    sfx.tapKick()
   }
   // Any tap or click that a HUD control did not take (they stop propagation) boosts mid-race.
   // With the cursor grabbed (pointer lock) a click is still a tap, but has no spot for the ripple.

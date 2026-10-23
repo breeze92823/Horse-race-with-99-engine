@@ -178,25 +178,74 @@ function glock(t, notes, gap, gain = 0.14, verb = 0.25, bus = A.sfx) {
 }
 
 // --- World + race --------------------------------------------------------------------------------
-// Water splash: the impact thud, white spray, then a cloud of bubbles and the drops coming back down.
-export function splash(size = 1, pan = 0, bus = A.sfx) {
-  if (!voice(1.2, 2)) return
-  const t = now()
-  const k = COARSE_POINTER ? 0.6 : 1
-  burst({ t, noise: 'pink', type: 'lowpass', f: 650, f2: 200, q: 0.7, a: 0.004, d: 0.2 * size, gain: 0.4 * Math.min(1.4, size), pan, bus })
-  tone({ t, f: 90, f2: 45, d: 0.13, gain: 0.28 * Math.min(1.4, size), pan, bus })
-  burst({ t, type: 'highpass', f: 2400, q: 0.5, a: 0.012, d: 0.5 * size, gain: 0.16 * size, pan, bus, verb: 0.12 })
-  bubbles({ t, n: Math.round(26 * size * k), dur: 0.35 * size, f0: 330, f1: 2200, gain: 0.08, bus, verb: 0.12 })
-  bubbles({ t: t + 0.22 * size, n: Math.round(14 * size * k), dur: 0.5 * size, f0: 1200, f1: 4200, gain: 0.035, d: [0.008, 0.02], bus })
-}
-
-// Every boost tap: a slap of spray off the bow (the engine blips itself, engine.js).
-export function tapSpray() {
+// Every boost tap: the boosters spit a puff and a hoof scuffs the dirt (the roar flares itself,
+// mount.js).
+export function tapKick() {
   if (!limit('tap', 45) || !voice(0.2, 1)) return
   const t = now()
   const pan = rnd(-0.25, 0.25)
-  burst({ t, f: vary(3200, 0.15), f2: 1700, q: 0.7, a: 0.006, d: 0.09, gain: 0.07, pan })
-  bubbles({ t, n: 3, dur: 0.06, f0: 700, f1: 2400, gain: 0.03 })
+  burst({ t, noise: 'pink', f: vary(700, 0.15), f2: 2400, q: 0.7, a: 0.01, d: 0.1, gain: 0.08, pan })
+  burst({ t: t + 0.01, noise: 'brown', type: 'lowpass', f: 400, q: 0.6, a: 0.003, d: 0.05, gain: 0.06, pan })
+}
+
+// A horse's whinny: a voiced source (two detuned saws) that leaps up, trills down in a fast
+// vibrato and ends in a low nicker, shaped by nasal formants, with breath under it. gain = level,
+// pan = where it comes from.
+export function neigh(gain = 0.16, pan = 0, t = now()) {
+  if (!voice(1.6, 2)) return
+  const ctx = A.ctx
+  const out = ctx.createGain()
+  out.gain.value = gain
+  route(out, { pan, verb: 0.35 })
+  const amp = ctx.createGain()
+  amp.gain.setValueAtTime(0.0001, t)
+  amp.gain.linearRampToValueAtTime(1, t + 0.06)
+  amp.gain.setValueAtTime(1, t + 0.75)
+  amp.gain.exponentialRampToValueAtTime(0.25, t + 1.0)
+  amp.gain.exponentialRampToValueAtTime(0.0001, t + 1.35)
+  const shape = ctx.createWaveShaper()
+  shape.curve = saturation(1.6)
+  shape.connect(amp).connect(out)
+  // Formants: the long nasal tract.
+  for (const [f, q, g] of [[820, 4, 1], [1550, 5, 0.7], [2750, 6, 0.4]]) {
+    const bp = ctx.createBiquadFilter()
+    bp.type = 'bandpass'
+    bp.frequency.value = vary(f, 0.05)
+    bp.Q.value = q
+    const k = ctx.createGain()
+    k.gain.value = g * 2.2
+    bp.connect(k).connect(shape)
+    for (const det of [-9, 9]) {
+      const o = ctx.createOscillator()
+      o.type = 'sawtooth'
+      o.detune.value = det
+      const base = vary(1, 0.04)
+      o.frequency.setValueAtTime(520 * base, t)
+      o.frequency.exponentialRampToValueAtTime(980 * base, t + 0.12) // the leap up
+      o.frequency.exponentialRampToValueAtTime(760 * base, t + 0.45)
+      o.frequency.exponentialRampToValueAtTime(430 * base, t + 0.95) // trilling down
+      o.frequency.exponentialRampToValueAtTime(170 * base, t + 1.05) // into the nicker
+      o.frequency.setValueAtTime(170 * base, t + 1.3)
+      // The whinny's trill: a fast, deep vibrato.
+      const vib = ctx.createOscillator()
+      vib.frequency.setValueAtTime(rnd(16, 20), t)
+      vib.frequency.linearRampToValueAtTime(12, t + 1)
+      const depth = ctx.createGain()
+      depth.gain.setValueAtTime(20, t)
+      depth.gain.linearRampToValueAtTime(70, t + 0.4)
+      depth.gain.linearRampToValueAtTime(30, t + 1)
+      vib.connect(depth).connect(o.frequency)
+      o.connect(bp)
+      o.start(t)
+      o.stop(t + 1.4)
+      vib.start(t)
+      vib.stop(t + 1.4)
+    }
+  }
+  // Breath through the nose, and the nicker's two low pulses at the end.
+  burst({ t, noise: 'pink', f: 1400, q: 0.7, a: 0.05, hold: 0.7, d: 0.3, gain: 0.05 * (gain / 0.16), pan })
+  for (const at of [1.05, 1.17]) tone({ t: t + at, f: vary(150, 0.05), f2: 110, d: 0.09, gain: 0.12 * (gain / 0.16), lp: 900, pan })
+  return t + 1.35
 }
 
 // Stadium air horn: two reeds a major third apart, a breath of air, and the
@@ -236,10 +285,13 @@ export function airHorn(len = 0.7, t = now(), gain = 0.17) {
   return t + len + 0.16
 }
 
+// Race start: the air horn, and the horse answers it with a whinny.
 export function raceStart() {
   if (!voice(1.2, 3)) return
   claim()
-  airHorn(0.75)
+  const t = now()
+  airHorn(0.75, t)
+  neigh(0.17, 0, t + 0.55)
   buzz(60)
 }
 
@@ -440,15 +492,16 @@ export function unlock() {
   glock(t + 0.12, [0, 7, 12, 16, 19], 0.07, 0.13)
 }
 
-// The boat hops: air lifts it, a little sand kicks up.
+// The horse jumps: a grunted blow as it pushes off, the hind hooves kick the dirt.
 export function jump() {
-  if (!limit('jump', 150) || !voice(0.25, 1)) return
+  if (!limit('jump', 150) || !voice(0.3, 1)) return
   const t = now()
-  burst({ t, noise: 'pink', f: 450, f2: 1400, q: 0.9, a: 0.03, d: 0.12, gain: 0.12 })
-  crinkle({ t, n: 7, dur: 0.12, gain: 0.04, f0: 2500, f1: 7000 })
+  burst({ t, noise: 'pink', f: 700, f2: 450, q: 1.3, a: 0.02, d: 0.14, gain: 0.1 })
+  tone({ t, f: vary(90, 0.06), f2: 55, d: 0.07, gain: 0.22 })
+  crinkle({ t: t + 0.02, n: 7, dur: 0.12, gain: 0.04, f0: 2000, f1: 6000 })
 }
 
-// Landing on sand (k 0..1 = how hard): a thud, sand spraying out, grains settling.
+// Landing (k 0..1 = how hard): all four hooves thud down, dirt sprays out and settles.
 export function land(k = 0.5) {
   if (!limit('land', 120) || !voice(0.4, 1)) return
   const t = now()
@@ -459,7 +512,7 @@ export function land(k = 0.5) {
   crinkle({ t: t + 0.03, n: Math.round(6 + 8 * k), dur: 0.25, gain: 0.035 * k, f0: 3000, f1: 9000 })
 }
 
-// Respawn: a whoosh in and a small splash as the boat drops back.
+// Respawn: a whoosh in and a chime as the horse appears back at the spawn.
 export function respawnFx() {
   if (!limit('respawn', 400) || !voice(0.9, 2)) return
   const t = now()
