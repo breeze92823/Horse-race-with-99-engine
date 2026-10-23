@@ -14,7 +14,7 @@
 // patterns in trailTextures.js; owned/equipped are saved by the server
 // (snapshot / hydrate, net.js). Sizes are reference pixels x --tu (trails.css).
 import './trails.css'
-import { BOAT, CAMERA, TRAILS } from './config.js'
+import { CAMERA, HORSE, TRAILS } from './config.js'
 import { ICONS } from './hudIcons.js'
 import { trailSwatch } from './trailTextures.js'
 import { replay } from './uiWindow.js'
@@ -291,9 +291,9 @@ export function createTrails({ wallet, rebirths = () => 0, onPreview, onOpen, on
     }
     const portrait = camera.aspect < 1
     const halfV = Math.tan((camera.fov * Math.PI) / 360)
-    const fit = BOAT.length / ((portrait ? S.portraitBoatWidth : S.boatWidth) * 2 * halfV * camera.aspect)
+    const fit = HORSE.length / ((portrait ? S.portraitBoatWidth : S.boatWidth) * 2 * halfV * camera.aspect)
     const dist = Math.max(S.distance, fit)
-    const ty = S.y + BOAT.deck + 0.3
+    const ty = S.y + HORSE.saddle * 0.7
     const lift = S.height * (dist / S.distance)
     camera.position.set(S.x - vx * dist, ty + lift, S.z - vz * dist)
     const raise = portrait ? S.portraitRaise * halfV * Math.hypot(dist, lift) : 0

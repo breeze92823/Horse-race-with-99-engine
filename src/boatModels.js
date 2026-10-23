@@ -18,7 +18,7 @@ import {
   Vector3,
 } from 'three'
 import { BOATS } from './config.js'
-import { makeEngine } from './boat.js'
+import { makeEngine } from './horse.js'
 import { put, std } from './propkit.js'
 
 // Every boat in the Boats catalog (BOATS.list in config.js), also used by the

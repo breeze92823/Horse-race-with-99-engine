@@ -1,24 +1,22 @@
 // The other players in the room, drawn in the world (after Clean-leaves-for-loot's remotePlayers.js):
-// each is their Bloxity avatar standing in their equipped boat (hull, engines in the equipped
-// engine's colours x the boat's engine count), their trail behind it, their pets hovering round it,
-// their partner on the deck and a name tag, eased toward the pose the server last relayed (net.js
+// each is their Bloxity avatar riding their horse (dressed as their equipped mount, boosters in the
+// equipped engine's colours x the mount's engine count), their trail behind it, their pets hovering
+// round it, their partner on its rump and a name tag, eased toward the pose the server last relayed (net.js
 // roster), plus speed x heading for the time since (dead reckoning), so fast racers glide instead
 // of stepping. Poses are in TRACK coordinates (z minus the sender's race scroll): drawn at
 // z + this player's own scroll, racers line up in the lane and lobby players slide away with the
 // start island while this player races. Diffed against the roster every frame, so joins / leaves /
 // gear changes need no events. Nearest first, capped (fewer on touch); pets, partner and trail only
-// up close; a remote boat is `lite` (boat.js) and its hull baked, without shadows (draw calls).
+// up close; a remote horse is `lite` (horse.js): engines baked, no shadows (draw calls).
 import { Group } from 'three'
 import { BOATS, COARSE_POINTER, NET } from './config.js'
 import { roster, net, sameWorld } from './net.js'
-import { createBoat } from './boat.js'
-import { buildBoat } from './boatModels.js'
+import { boatLook, createHorse } from './horse.js'
 import { ENGINES } from './engine.js'
 import { trailById } from './trails.js'
 import { createTrail } from './trail.js'
 import { createCompanions } from './companions.js'
 import { label } from './propkit.js'
-import { bake } from './bake.js'
 import { buildDefaultCharacter, loadBaseCharacter } from './avatar/character.js'
 import { applyProportions, attachEquippedAccessories } from './avatar/loader.js'
 import { disposeAnimator, makeAnimator } from './avatar/animator.js'
@@ -37,25 +35,16 @@ function parsePets(s) {
   })
 }
 
-// A catalog hull merged to a few meshes (one per material), shadows off: cheap to draw many.
-function bakedHull(id) {
-  const src = buildBoat(id)
-  const model = bake(src)
-  model.userData = { ...src.userData }
-  src.traverse((o) => o.isMesh && o.geometry.dispose()) // the baked copy keeps the materials
-  return model
-}
-
 class Remote {
   constructor(scene) {
     this.scene = scene
     this.group = new Group()
     this.group.visible = false
     scene.add(this.group)
-    this.boat = createBoat({ lite: true })
-    this.group.add(this.boat.root)
-    this.trail = createTrail(scene, this.boat.root)
-    this.companions = createCompanions(scene, this.boat.seat)
+    this.horse = createHorse({ lite: true })
+    this.group.add(this.horse.root)
+    this.trail = createTrail(scene, this.horse.root)
+    this.companions = createCompanions(scene, this.horse.seat)
     this.avatar = null
     this.animator = null
     this.avatarJson = null // what the current rig was built from
@@ -71,11 +60,11 @@ class Remote {
   }
 
   setAvatar(next) {
-    if (this.avatar) this.boat.rider.remove(this.avatar)
+    if (this.avatar) this.horse.rider.remove(this.avatar)
     disposeAnimator(this.animator)
     this.avatar = next
     next.traverse((o) => o.isMesh && (o.castShadow = false)) // shadow passes add up in a full room
-    this.boat.rider.add(next)
+    this.horse.rider.add(next)
     this.animator = makeAnimator(next)
   }
 
@@ -108,16 +97,13 @@ class Remote {
     const a = this.applied
     if (p.boat !== a.boat) {
       a.boat = p.boat
-      const model = bakedHull(boatById.has(p.boat) ? p.boat : BOATS.start.equipped) // none sent yet: the starter
-      const old = this.boat.setHull(model)
-      model.traverse((o) => o.isMesh && (o.castShadow = false))
-      old.traverse((o) => o.isMesh && o.geometry.dispose())
+      this.horse.setLook(boatLook(boatById.get(boatById.has(p.boat) ? p.boat : BOATS.start.equipped))) // none sent yet: the starter
       a.engine = undefined // the engine count comes with the boat
     }
     if (p.engine !== a.engine) {
       a.engine = p.engine
       const count = boatById.get(boatById.has(p.boat) ? p.boat : BOATS.start.equipped)?.engines ?? 1
-      this.boat.setEngines(engineById.get(p.engine)?.look ?? null, count)
+      this.horse.setEngines(engineById.get(p.engine)?.look ?? null, count)
     }
     if (p.trail !== a.trail) {
       a.trail = p.trail
@@ -181,8 +167,9 @@ class Remote {
     this.lastY = g.position.y
     this.placed = true
 
-    this.boat.update(dt, b.speed, 0, t)
-    this.animator?.update(dt, { grounded: Math.abs(this.vy) < 0.5, speed: 0, verticalVelocity: this.vy, turn: 0 })
+    const grounded = Math.abs(this.vy) < 0.5
+    this.horse.update(dt, b.speed, 0, t, 0, grounded, this.vy)
+    this.animator?.update(dt, { grounded, speed: b.speed, verticalVelocity: this.vy, turn: 0, riding: true })
     if (near) {
       this.companions.update(dt, t, g.position.x, g.position.y, g.position.z, g.rotation.y)
       if (this.applied.trailShown) this.trail.update(dt, camera, scrollSpeed)
@@ -204,12 +191,12 @@ class Remote {
     disposeAnimator(this.animator)
     this.trail.dispose()
     this.companions.dispose() // takes the partner (shared, cached geometry) off the seat first
-    this.boat.rider.remove(this.avatar) // rig geometry is shared with every other character
+    this.horse.rider.remove(this.avatar) // rig geometry is shared with every other character
     if (this.label) {
       this.label.material.map?.dispose()
       this.label.material.dispose()
     }
-    this.boat.root.traverse((o) => o.isMesh && o.geometry.dispose()) // hull + engines: this boat's own
+    this.horse.root.traverse((o) => o.isMesh && o.geometry.dispose()) // body parts + engines: this horse's own
   }
 }
 

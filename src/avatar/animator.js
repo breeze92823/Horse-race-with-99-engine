@@ -52,7 +52,7 @@ class PlayerAnimator {
     this.root.position.y = 0
   }
 
-  // input: { grounded, speed, verticalVelocity, turn (-1..1) }
+  // input: { grounded, speed, verticalVelocity, turn (-1..1), riding (seated on the horse) }
   update(dt, input) {
     if (!(dt > 0)) return
     this.stateTime += dt
@@ -64,6 +64,8 @@ class PlayerAnimator {
   }
 
   resolveState(dt, input) {
+    // In the saddle the horse does the moving (and the jumping): the rider only sits.
+    if (input.riding) return this.setState('ride', ANIM.transitions.toRide)
     if (!input.grounded) {
       // Ignore the few frames of a step down a ledge; only a real drop is airborne.
       this.airTime += dt
@@ -108,6 +110,16 @@ class PlayerAnimator {
         const frequency = clamp(input.speed / L.strideDistance, L.minFrequency, L.maxFrequency)
         this.phase = (this.phase + frequency * TAU * dt) % TAU
         this.writeLocomotion(t, input.speed)
+        break
+      }
+      case 'ride': {
+        this.idleTime += dt
+        const R = ANIM.ride
+        t.applyDefinition(R.pose)
+        const breath = Math.sin(this.idleTime * ANIM.idle.breathFrequency * TAU)
+        t.add('Spine1', clamp(input.speed / R.leanSpeed, 0, 1) * R.lean + breath * R.breath)
+        t.add('Neck1', -clamp(input.speed / R.leanSpeed, 0, 1) * R.lean * 0.6)
+        t.bobY = 0
         break
       }
       case 'airborne': {

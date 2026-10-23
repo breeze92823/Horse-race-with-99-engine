@@ -346,22 +346,46 @@ export const BOATS = {
 // A small rocky islet with palms out at sea, seen past the stall in the east view.
 export const ISLET = { x: 115, z: -40, rock: [0, 0, 28, 18, 18, 0.3], hill: { rx: 36, ry: 7, rz: 24 } }
 
-// --- Player boat (boat.js) ------------------------------------------------------
-export const BOAT = {
-  length: 3.6, // m bow to stern
-  beam: 1.15, // m wide
-  deck: 0.32, // m the rider stands above the player's feet
-  hull: '#ffc21a',
-  hullDark: '#8a4b1c',
-  cockpit: '#d9822b',
+// --- Player horse (horse.js) -----------------------------------------------------
+export const HORSE = {
+  length: 3.1, // m nose to tail (the Trails scene's framing)
+  saddle: 1.7, // m the saddle's top above the hooves
+  riderY: 1.08, // m the rider's root (its feet at bind pose) above the hooves: seated, hips on the saddle
+  riderZ: -0.04, // m the rider sits behind the saddle's centre
+  // Model sizes (m, hooves at y 0, nose +Z): barrel ellipsoid, legs hanging from hipY with the knee
+  // at kneeY, the saddle at saddleZ and the booster rack across the croup at rackY / rackZ.
+  dims: { barrelY: 1.15, barrelLength: 1.9, barrelHeight: 0.86, barrelWidth: 0.78, hipY: 0.98, kneeY: 0.48, frontZ: 0.66, hindZ: -0.64, saddleZ: 0.08, rackY: 1.4, rackZ: -0.5, neckRadius: 0.22, neckLength: 0.42 },
+  // Default colours (a catalog mount overrides some): blaze = the white stripe down the face (false = none).
+  look: {
+    coat: '#8a5a32', mane: '#2e1d12', hoof: '#2a2420', muzzle: '#6b4428', blaze: '#f2ece0', socks: false, sock: '#f2ece0',
+    blanket: '#d8343a', trim: '#ffd84a', saddle: '#6b3b1d', leather: '#3b2414', metal: '#c9ced6', rack: '#3a3f48',
+  },
   engine: '#1d6b55',
   engineBand: '#8dff6a',
   flame: '#38d7ff',
   flameGlow: 3, // HDR multiplier on the engine flames when bloom is on (propkit neon)
-  bobAmount: 0.05, // m idle bob
-  bobFrequency: 1.6, // Hz
-  pitchPerAccel: 0.012, // rad of nose-up per m/s^2 of acceleration
-  rollPerTurn: 0.12, // rad of lean into a turn
+  engineScale: 0.66, // boosters are a bit smaller than the lobby's parked engines
+  // Gaits (horse.js): walk -> trot over toTrot m/s, trot -> gallop over toGallop; one cycle per
+  // `stride` m (rate clamped to minRate..maxRate Hz). Per gait: duty = share of the cycle a hoof is
+  // down, swing / flex = rad of leg swing and knee lift, bob = m the body rises per footfall, rock =
+  // rad the gallop rocks the body. *Rest = [upper, lower] rad of a standing leg; jump* = tucked in the air.
+  gait: {
+    idleSpeed: 0.25,
+    toTrot: [2.2, 3.6],
+    toGallop: [6.5, 9.5],
+    minRate: 0.7,
+    maxRate: 3,
+    walk: { stride: 1.5, duty: 0.62, swing: 0.32, flex: 0.7, bob: 0.025 },
+    trot: { stride: 2.5, duty: 0.48, swing: 0.45, flex: 1.2, bob: 0.05 },
+    gallop: { stride: 3.8, duty: 0.38, swing: 0.7, flex: 1.6, bob: 0.08, rock: 0.07 },
+    frontRest: [0, 0],
+    hindRest: [0.12, -0.2],
+    hindFlex: 0.6,
+    jumpFront: [-0.9, 1.9],
+    jumpHind: [0.6, 0.2],
+  },
+  pitchPerAccel: 0.01, // rad of nose-up per m/s^2 of acceleration
+  rollPerTurn: 0.1, // rad of lean into a turn
   ease: 6, // 1/s the tilt eases
 }
 
@@ -766,7 +790,21 @@ export const ANIM = {
     },
     bobY: -0.2,
   },
-  transitions: { toLocomotion: 0.14, toAirborne: 0.12, toLanding: 0.06 }, // s to blend a pose change
+  // Seated in the saddle (horse.js carries the bob and lean): thighs forward and splayed round the
+  // barrel, shins hanging, hands forward on the reins; leans forward up to `lean` by `leanSpeed` m/s.
+  ride: {
+    pose: {
+      LegL1: { x: deg(-40), y: deg(20), z: deg(30) }, LegR1: { x: deg(-40), y: deg(-20), z: deg(-30) },
+      LegL2: { x: deg(45) }, LegR2: { x: deg(45) },
+      ArmL1: { x: deg(-42), z: deg(4) }, ArmR1: { x: deg(-42), z: deg(-4) },
+      ArmL2: { x: deg(48) }, ArmR2: { x: deg(48) },
+      Spine1: { x: deg(3) },
+    },
+    lean: deg(16),
+    leanSpeed: 14,
+    breath: deg(1.5),
+  },
+  transitions: { toLocomotion: 0.14, toAirborne: 0.12, toLanding: 0.06, toRide: 0.2 }, // s to blend a pose change
 }
 
 export const FONT_FAMILY = 'Fredoka'

@@ -23,7 +23,7 @@ import {
   Vector2,
 } from 'three'
 import { LOBBY, SPAWN, WATER } from './config.js'
-import { makeEngine } from './boat.js'
+import { makeEngine } from './horse.js'
 import { paintChecker, paintChevrons, paintFade, paintSoftDot } from './textures.js'
 import { fontReady, glow, label, neon, put, solidBox, solidPole, std } from './propkit.js'
 import { createEmitter } from './particles.js'

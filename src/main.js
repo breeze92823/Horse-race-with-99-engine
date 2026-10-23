@@ -34,8 +34,7 @@ import { createShops } from './shops.js'
 import { createHub } from './hub.js'
 import { createInteract } from './interact.js'
 import { createEggs } from './eggs.js'
-import { createBoat } from './boat.js'
-import { buildBoat, disposeBoat } from './boatModels.js'
+import { boatLook, createHorse } from './horse.js'
 import { boatState, createBoats } from './boats.js'
 import { createRace } from './race.js'
 import { createTraining } from './training.js'
@@ -122,23 +121,23 @@ syncYawToPlayer()
 // --- Player avatar ----------------------------------------------------------
 // The Bloxity base rig (player.glb; procedural fallback if it fails), dressed
 // with the signed-in player's equipped cosmetics and body proportions. It
-// rebuilds on customizer edits and sign-in/out. The avatar stands in the
-// player's boat (boat.js), which carries it around the lobby.
+// rebuilds on customizer edits and sign-in/out. The avatar rides the player's
+// horse (horse.js), which carries it around the lobby.
 const playerGroup = new Group()
 scene.add(playerGroup)
-const boat = createBoat()
-playerGroup.add(boat.root)
-const trail = createTrail(scene, boat.root) // the equipped trail, streaming off the stern
+const horse = createHorse()
+playerGroup.add(horse.root)
+const trail = createTrail(scene, horse.root) // the equipped trail, streaming off behind the horse
 let avatar = null
 let animator = null
 let generation = 0
 let avatarReady = false
 
 function setAvatar(next) {
-  if (avatar) boat.rider.remove(avatar)
+  if (avatar) horse.rider.remove(avatar)
   disposeAnimator(animator)
   avatar = next
-  boat.rider.add(avatar)
+  horse.rider.add(avatar)
   animator = makeAnimator(avatar)
 }
 
@@ -234,10 +233,10 @@ bloxity.subscribeAuth(() => hud.setPfp(bloxity.getPfp()))
 const engineWindow = createEngine({
   wins: { get: () => hud.getStat('trophies'), set: (n) => hud.setStat('trophies', n) },
 })
-// Boats are bought with Wins (the HUD's trophy counter); equipping one swaps the hull the player rides.
+// Mounts are bought with Wins (the HUD's trophy counter); equipping one dresses the player's horse.
 const boatsWindow = createBoats({
   wallet: { wins: () => hud.getStat('trophies'), spend: (n) => hud.setStat('trophies', hud.getStat('trophies') - n) },
-  onEquip: (id) => disposeBoat(boat.setHull(buildBoat(id))),
+  onEquip: (id) => horse.setLook(boatLook(BOATS.list.find((b) => b.id === id))),
 })
 onKey('KeyO', boatsWindow.toggle)
 // Every partner is bought with Wins (the HUD's trophy counter); none is free.
@@ -287,11 +286,11 @@ trailsScene = createTrails({
   onOpen: () => {
     closeTopWindow()
     hud.setScene(true)
-    boat.rider.visible = false // the reference shows the bare boat
+    horse.rider.visible = false // the reference shows the bare mount
   },
   onClose: () => {
     hud.setScene(false)
-    boat.rider.visible = true
+    horse.rider.visible = true
     playerGroup.visible = getMode() !== 'player'
     inputState.look.dx = inputState.look.dy = 0 // nothing the scene swallowed may turn the camera
   },
@@ -308,7 +307,7 @@ const race = createRace({
   world,
   home,
   onEnd() {
-    boat.rider.visible = true
+    horse.rider.visible = true
     playerGroup.visible = getMode() !== 'player'
     // AUTO RACE goes again once the result has been up for a moment.
     setTimeout(() => autoRace && !trailsScene.isOpen() && race.start(), RACE.resultSeconds * 1000)
@@ -350,7 +349,7 @@ onKey('KeyE', () => interact.trigger() || engineWindow.toggle())
 // (made after the start island's objects, so none of this slides away with it during a race)
 // The equipped pets hover round the boat, the partner stands behind the rider and the engines take
 // the equipped engine's colours x the boat's engine count. Polled: any window may change the gear.
-const companions = createCompanions(scene, boat.seat, { shadows: true })
+const companions = createCompanions(scene, horse.seat, { shadows: true })
 const engineLooks = new Map(ENGINES.map((e) => [e.id, e.look]))
 const boatEngines = new Map(BOATS.list.map((b) => [b.id, b.engines]))
 let gearKey = ''
@@ -370,7 +369,7 @@ function syncGear() {
   const ek = `${gear.boat}|${gear.engine}`
   if (ek !== enginesKey) {
     enginesKey = ek
-    boat.setEngines(engineLooks.get(gear.engine) ?? null, boatEngines.get(gear.boat) ?? 1)
+    horse.setEngines(engineLooks.get(gear.engine) ?? null, boatEngines.get(gear.boat) ?? 1)
   }
   companions.setPets(gear.pets)
   companions.setPartner(gear.partner)
@@ -416,22 +415,17 @@ renderer.setAnimationLoop(() => {
   if (staging) {
     trailsScene.stage(camera, playerGroup)
     playerGroup.visible = true
-    boat.update(dt, TRAILS.showcase.speed, 0, elapsed)
-    animator?.update(dt, { grounded: true, speed: 0, verticalVelocity: 0, turn: 0 })
+    horse.update(dt, TRAILS.showcase.speed, 0, elapsed)
+    animator?.update(dt, { grounded: true, speed: TRAILS.showcase.speed, verticalVelocity: 0, turn: 0, riding: true })
   } else if (racing) {
     playerGroup.visible = true // the boat stays in view; in first person only the rider is hidden
-    boat.rider.visible = getMode() !== 'player'
-    boat.update(dt, race.boatSpeed(), inputState.move.x, elapsed, race.tapBoost())
-    animator?.update(dt, { grounded: true, speed: 0, verticalVelocity: 0, turn: 0 })
+    horse.rider.visible = getMode() !== 'player'
+    horse.update(dt, race.boatSpeed(), inputState.move.x, elapsed, race.tapBoost())
+    animator?.update(dt, { grounded: true, speed: race.boatSpeed(), verticalVelocity: 0, turn: 0, riding: true })
   } else if (getMode() === 'character') {
-    boat.update(dt, speed, inputState.move.x, elapsed)
-    // Riding: the avatar stands still in the boat (idle pose), only jumps animate.
-    animator?.update(dt, {
-      grounded: player.grounded,
-      speed: 0,
-      verticalVelocity: player.velocity.y,
-      turn: 0,
-    })
+    horse.update(dt, speed, inputState.move.x, elapsed, 0, player.grounded, player.velocity.y)
+    // Riding: the avatar sits in the saddle; the horse walks, gallops and jumps under it.
+    animator?.update(dt, { grounded: player.grounded, speed, verticalVelocity: player.velocity.y, turn: 0, riding: true })
   }
 
   if (racing) race.camera(camera, dt)
@@ -490,5 +484,5 @@ if (import.meta.env.DEV) {
     resetPlayer({ x, y, z }, facing)
     syncYawToPlayer()
   }
-  window.__game = { player, scene, renderer, camera, postfx, bodies: bodyCount, toggleMode, toggleDay, teleport, rebirth: rebirthWindow, trails: trailsScene, gifts: giftsWindow, daily: dailyWindow, spin: spinWindow, hud, race, training, eggs, pets: petsWindow, net, remotes, companions, plaza, worlds, env }
+  window.__game = { player, horse, animator: () => animator, scene, renderer, camera, postfx, bodies: bodyCount, toggleMode, toggleDay, teleport, rebirth: rebirthWindow, trails: trailsScene, gifts: giftsWindow, daily: dailyWindow, spin: spinWindow, hud, race, training, eggs, pets: petsWindow, net, remotes, companions, plaza, worlds, env }
 }

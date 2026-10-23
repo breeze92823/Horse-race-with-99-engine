@@ -1,6 +1,6 @@
 import { Box3, BoxGeometry, Color, ConeGeometry, CylinderGeometry, DodecahedronGeometry, Euler, Float32BufferAttribute, Group, Matrix4, Mesh, Quaternion, SphereGeometry, TorusGeometry, Vector3 } from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
-import { BOAT, LOBBY, PLAZA, RACE, WATER } from './config.js'
+import { LOBBY, PLAZA, RACE, WATER } from './config.js'
 import { buildCliff, buildPalm, glow, neon, std } from './propkit.js'
 import { makeHill } from './world.js'
 import { buildBoat } from './boatModels.js'
@@ -161,8 +161,8 @@ function ship([id, length], seed) {
   holder.add(model)
   const baked = bake(holder)
   model.traverse((o) => o.isMesh && o.geometry.dispose()) // its materials live on in the baked meshes
-  // boat.js floats the player's hull origin ~0.6 m over the water at BOAT.length; the same, scaled.
-  const y = WATER.level + 0.4 * (length / BOAT.length)
+  // The catalog hulls were built to float their origin ~0.4 m over the water at 3.6 m long; the same, scaled.
+  const y = WATER.level + 0.4 * (length / 3.6)
   const root = new Group()
   root.add(baked)
   const phase = seed * 1.7
