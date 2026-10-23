@@ -1,7 +1,7 @@
 // Trails scene (the reference's "TRAILS" screen, opened by the HUD's Trail
 // tile or L). Not a popup: the HUD folds down to its logo pill and round
-// buttons, the boat is parked broadside in the sea with its trail streaming
-// (stage(), driven from main.js), and the UI sits around it like the shot:
+// buttons, the horse gallops in place broadside in the meadow off the east
+// wing with its trail streaming (stage(), driven from main.js), and the UI sits around it like the shot:
 //   left   - gold "TRAILS" title, white panel with a scrolling 3-column grid of
 //            round trail pictures (gold cards with art, Wins prices, darker
 //            padlocked "Rebirth N" cards), Wins pill under it
@@ -10,7 +10,7 @@
 //   bottom - red Exit
 // White is free; everything else is bought with Wins (the HUD counter), at a
 // price set by its boosts (TRAILS.pricing). Tapping a card previews it on the
-// boat; leaving puts the equipped one back. Catalog: TRAILS in config.js, the
+// horse; leaving puts the equipped one back. Catalog: TRAILS in config.js, the
 // patterns in trailTextures.js; owned/equipped are saved by the server
 // (snapshot / hydrate, net.js). Sizes are reference pixels x --tu (trails.css).
 import './trails.css'
@@ -136,7 +136,7 @@ const MARKUP = `
 
 // wallet: { wins() -> number, spend(n) } (the HUD's Wins counter).
 // rebirths() -> the player's rebirth count (gates the Rebirth N trails).
-// onPreview(trail | null) shows a trail on the boat; onOpen / onClose bracket the scene.
+// onPreview(trail | null) shows a trail on the horse; onOpen / onClose bracket the scene.
 // Returns { open, close, toggle, isOpen, stage, snapshot, hydrate }.
 export function createTrails({ wallet, rebirths = () => 0, onPreview, onOpen, onClose }) {
   const root = document.createElement('div')
@@ -275,32 +275,33 @@ export function createTrails({ wallet, rebirths = () => 0, onPreview, onOpen, on
   }
   q('.tr-exit').addEventListener('click', close)
 
-  // Parks `boat` (the player's group) in the sea and frames it with `camera`:
+  // Stands `horse` (the player's group) on the meadow and frames it with `camera`:
   // broadside, centred on landscape screens, pulled back and raised above the
-  // panels on portrait ones so the whole hull fits.
+  // panels on portrait ones so the whole horse and its trail fit. main.js gallops it
+  // in place (speed TRAILS.showcase.speed) and slides the trail back at that speed.
   const S = TRAILS.showcase
   const vl = Math.hypot(S.view[0], S.view[1])
   const vx = S.view[0] / vl
   const vz = S.view[1] / vl
-  function stage(camera, boat) {
-    boat.position.set(S.x, S.y, S.z)
-    boat.rotation.set(0, Math.atan2(-vz, vx), 0) // nose toward the camera's right
+  function stage(camera, horse) {
+    horse.position.set(S.x, S.y, S.z)
+    horse.rotation.set(0, Math.atan2(-vz, vx), 0) // nose toward the camera's right
     if (camera.fov !== CAMERA.fov) {
       camera.fov = CAMERA.fov
       camera.updateProjectionMatrix()
     }
     const portrait = camera.aspect < 1
     const halfV = Math.tan((camera.fov * Math.PI) / 360)
-    const fit = HORSE.length / ((portrait ? S.portraitBoatWidth : S.boatWidth) * 2 * halfV * camera.aspect)
+    const fit = HORSE.length / ((portrait ? S.portraitHorseWidth : S.horseWidth) * 2 * halfV * camera.aspect)
     const dist = Math.max(S.distance, fit)
-    const ty = S.y + HORSE.saddle * 0.7
+    const ty = S.y + HORSE.saddle * S.lookAt
     const lift = S.height * (dist / S.distance)
     camera.position.set(S.x - vx * dist, ty + lift, S.z - vz * dist)
     const raise = portrait ? S.portraitRaise * halfV * Math.hypot(dist, lift) : 0
     camera.lookAt(S.x, ty - raise, S.z)
   }
 
-  // A save loaded from the server (net.js): the boat wears its equipped trail (unless the scene is
+  // A save loaded from the server (net.js): the horse wears its equipped trail (unless the scene is
   // previewing one).
   function hydrate(doc) {
     applySave(doc)

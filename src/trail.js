@@ -2,20 +2,21 @@ import { AdditiveBlending, BufferAttribute, BufferGeometry, DoubleSide, DynamicD
 import { TRAILS } from './config.js'
 import { trailTexture } from './trailTextures.js'
 
-// The equipped trail behind the player's boat: a textured band fed from the
-// stern. Point 0 is pinned to the stern; a new point is dropped every
-// `spacing` metres, and each point narrows a little and fades at the end of
-// its `life`. The band turns about its path to face the camera, so it stands
-// upright seen from the side (the Trails scene) and lies flat on the water
-// seen from behind (the chase cam); its lower edge stays on the water. The
-// points are world space, and the texture is pinned to the distance travelled
-// when each point dropped, so patterns stay where they were laid. `scroll`
-// (m/s) slides every point backwards along the boat's heading, which makes a
-// parked boat look like it is speeding (the scene's showcase). A jump of more
-// than TELEPORT metres in one frame starts the band over.
+// The equipped trail behind the player's horse: a textured band fed from just
+// behind the hind hooves (TRAILS.ribbon.stern m back). Point 0 is pinned there;
+// a new point is dropped every `spacing` metres, and each point narrows a
+// little and fades at the end of its `life`. The band turns about its path to
+// face the camera, so it stands upright seen from the side (the Trails scene)
+// and lies flat on the ground seen from behind (the chase cam); its lower edge
+// stays on the ground. The points are world space, and the texture is pinned
+// to the distance travelled when each point dropped, so patterns stay where
+// they were laid. `scroll` (m/s) slides every point backwards along the
+// horse's heading, which makes a horse galloping in place look like it is
+// speeding (the scene's showcase, and the race once the world scrolls). A jump
+// of more than TELEPORT metres in one frame starts the band over.
 const TELEPORT = 8
 
-export function createTrail(scene, boatRoot) {
+export function createTrail(scene, horseRoot) {
   const R = TRAILS.ribbon
   const n = R.points
   const px = new Float32Array(n)
@@ -42,12 +43,12 @@ export function createTrail(scene, boatRoot) {
   geo.setDrawRange(0, 0)
   const mesh = new Mesh(geo)
   mesh.frustumCulled = false // the points move every frame
-  mesh.renderOrder = 3 // over the sea, the shallows and the engine glow
+  mesh.renderOrder = 3 // over the ground, the track and the engine glow
   mesh.visible = false
   scene.add(mesh)
 
   // One material per trail, made on first use. Not tone mapped: the colours
-  // stay as saturated on the water as on the cards.
+  // stay as saturated on the ground as on the cards.
   const materials = new Map()
   function material(trail) {
     if (!materials.has(trail.id)) {
@@ -102,9 +103,9 @@ export function createTrail(scene, boatRoot) {
       tile = trail.look.tile ?? R.tile
     },
     update(dt, camera, scroll = 0) {
-      boatRoot.updateWorldMatrix(true, false)
-      stern.set(0, R.height, -R.stern).applyMatrix4(boatRoot.matrixWorld)
-      fwd.set(0, 0, 1).transformDirection(boatRoot.matrixWorld)
+      horseRoot.updateWorldMatrix(true, false)
+      stern.set(0, R.height, -R.stern).applyMatrix4(horseRoot.matrixWorld)
+      fwd.set(0, 0, 1).transformDirection(horseRoot.matrixWorld)
       if (count === 0 || Math.hypot(stern.x - px[0], stern.z - pz[0]) > TELEPORT) reset()
       travel += Math.hypot(stern.x - px[0], stern.z - pz[0]) + scroll * dt
       if (travel > 20000) {
@@ -162,7 +163,7 @@ export function createTrail(scene, boatRoot) {
         if (side.y < 0) side.negate()
         const t = Math.min(1, age[i] / R.life)
         const half = (width * (1 - 0.3 * t)) / 2
-        const cy = py[i] + side.y * half // keeps the lower edge on the water
+        const cy = py[i] + side.y * half // keeps the lower edge on the ground
         pos.set([px[i] - side.x * half, cy - side.y * half, pz[i] - side.z * half, px[i] + side.x * half, cy + side.y * half, pz[i] + side.z * half], i * 6)
         const u = laid[i] / tile
         uv.set([u, 0, u, 1], i * 4)

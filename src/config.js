@@ -1137,14 +1137,16 @@ export const TRAILS = {
     { id: 'toxic', name: 'Toxic', rebirth: 45, stats: { wins: 1500, acc: 1400 }, look: { texture: 'toxic' } },
     { id: 'waterRipple', name: 'Water Ripple', rebirth: 50, stats: { wins: 1550, acc: 1840 }, look: { texture: 'ripple', add: true } },
   ],
-  // The ribbon behind the boat (trail.js): a band fed from the stern that turns
-  // to face the camera (upright seen from the side, flat on the water from
-  // behind), fading out over its life. width/tile are the defaults per look.
-  ribbon: { points: 72, life: 0.9, spacing: 0.35, width: 0.6, tile: 2.4, opacity: 0.95, height: 0.14, stern: 1.45 },
-  // The scene's showcase: the boat parked in the sea off the east wing, broadside
-  // to a low camera that looks back at the beach and cliffs (like the reference).
-  // view = horizontal direction the camera looks; the boat faces the camera's right.
-  showcase: { x: 57, z: -18.5, y: -0.72, view: [-0.795, 0.607], speed: 24, distance: 4.6, height: 0.95, boatWidth: 0.25, portraitBoatWidth: 0.62, portraitRaise: 0.3 },
+  // The ribbon behind the horse (trail.js): a band fed from just behind the hind hooves (`stern` m
+  // back, `height` m up) that turns to face the camera (upright seen from the side, flat on the
+  // ground from behind), fading out over its life. width/tile are the defaults per look.
+  ribbon: { points: 72, life: 0.9, spacing: 0.35, width: 0.7, tile: 2.4, opacity: 0.95, height: 0.04, stern: 1.0 },
+  // The scene's showcase: the horse galloping in place on the meadow off the east wing, broadside
+  // to a low camera that looks back at the ranch yard and cliffs (like the reference).
+  // view = horizontal direction the camera looks; the horse faces the camera's right. horseWidth =
+  // share of the screen width the horse's length fills (portrait*: on tall screens); lookAt = the
+  // camera aims this share of the saddle height up.
+  showcase: { x: 57, z: -18.5, y: GROUND.level, view: [-0.795, 0.607], speed: 24, distance: 5.2, height: 0.55, lookAt: 0.55, horseWidth: 0.34, portraitHorseWidth: 0.6, portraitRaise: 0.3 },
 }
 
 // --- Audio (src/audio/) ---------------------------------------------------------------
