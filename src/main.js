@@ -1,5 +1,5 @@
 import { ACESFilmicToneMapping, Clock, Group, PCFSoftShadowMap, PerspectiveCamera, Scene, SRGBColorSpace, WebGLRenderer } from 'three'
-import { BOATS, CAMERA, DAILY, graphicsPreset, PHYSICS, RACE, RENDER, TRAILS } from './config.js'
+import { CAMERA, HORSES, DAILY, graphicsPreset, PHYSICS, RACE, RENDER, TRAILS } from './config.js'
 import * as bloxity from './bloxity.js'
 import { initNet, net, onNetMessage, sendLoadout, sendPose, syncAvatar } from './net.js'
 import { inputState, install as installInput, onKey } from './input.js'
@@ -34,8 +34,9 @@ import { createShops } from './shops.js'
 import { createHub } from './hub.js'
 import { createInteract } from './interact.js'
 import { createEggs } from './eggs.js'
-import { boatLook, createHorse } from './horse.js'
-import { boatState, createBoats } from './boats.js'
+import { createHorse } from './horse.js'
+import { horseLook } from './horseModels.js'
+import { createHorses, horseState } from './horses.js'
 import { createRace } from './race.js'
 import { createTraining } from './training.js'
 import { createBoostPanel } from './boostPanel.js'
@@ -207,7 +208,7 @@ hud = createHud({
   rebirth: rebirthWindow.open,
   pets: petsWindow.open,
   engine: () => engineWindow.open(),
-  boats: () => boatsWindow.open(),
+  horses: () => horsesWindow.open(),
   partner: () => partnerWindow.open(),
   trail: () => race.isRacing() || trailsScene.open(), // the Trails scene would park the boat mid-race
   autoRace: (on) => {
@@ -233,12 +234,12 @@ bloxity.subscribeAuth(() => hud.setPfp(bloxity.getPfp()))
 const engineWindow = createEngine({
   wins: { get: () => hud.getStat('trophies'), set: (n) => hud.setStat('trophies', n) },
 })
-// Mounts are bought with Wins (the HUD's trophy counter); equipping one dresses the player's horse.
-const boatsWindow = createBoats({
+// Horses are bought with Wins (the HUD's trophy counter); equipping one dresses the player's horse.
+const horsesWindow = createHorses({
   wallet: { wins: () => hud.getStat('trophies'), spend: (n) => hud.setStat('trophies', hud.getStat('trophies') - n) },
-  onEquip: (id) => horse.setLook(boatLook(BOATS.list.find((b) => b.id === id))),
+  onEquip: (id) => horse.setLook(horseLook(id)),
 })
-onKey('KeyO', boatsWindow.toggle)
+onKey('KeyO', horsesWindow.toggle)
 // Every partner is bought with Wins (the HUD's trophy counter); none is free.
 const partnerWindow = createPartner({
   wins: { get: () => hud.getStat('trophies'), set: (n) => hud.setStat('trophies', n) },
@@ -334,14 +335,14 @@ const worlds = createWorlds({
 })
 
 // Hub pads in front of the Eggs stall, Boats stall, Engine Upgrade machine and hero statues open their windows.
-const hubWindows = { pets: petsWindow.open, boats: boatsWindow.open, engine: engineWindow.open, partner: partnerWindow.open }
+const hubWindows = { pets: petsWindow.open, horses: horsesWindow.open, engine: engineWindow.open, partner: partnerWindow.open }
 const hubFrom = scene.children.length
 const hub = createHub(scene, hubWindows)
 home.push(...scene.children.slice(hubFrom)) // the pads are on the island too
 // The egg window (E at a stall egg): odds, Open 1 / 3, Auto, the hatch overlay; it takes E / R / T while open.
 const eggs = createEggs({ hud, pets: petsWindow, spots: shops.spots.eggs })
 // E prompts on the shop objects: open an egg, buy/equip boats, engines and partners in the world.
-const interact = createInteract({ hud, lobby, shops, eggs, boats: boatsWindow, engine: engineWindow, partner: partnerWindow, windows: hubWindows })
+const interact = createInteract({ hud, lobby, shops, eggs, horses: horsesWindow, engine: engineWindow, partner: partnerWindow, windows: hubWindows })
 // E interacts with the object in front of you; with none in range it toggles the Engine window as before.
 onKey('KeyE', () => interact.trigger() || engineWindow.toggle())
 
@@ -351,12 +352,12 @@ onKey('KeyE', () => interact.trigger() || engineWindow.toggle())
 // the equipped engine's colours x the boat's engine count. Polled: any window may change the gear.
 const companions = createCompanions(scene, horse.seat, { shadows: true })
 const engineLooks = new Map(ENGINES.map((e) => [e.id, e.look]))
-const boatEngines = new Map(BOATS.list.map((b) => [b.id, b.engines]))
+const horseEngines = new Map(HORSES.list.map((h) => [h.id, h.engines]))
 let gearKey = ''
 let enginesKey = ''
 function syncGear() {
   const gear = {
-    boat: boatState.equipped ?? '',
+    boat: horseState.equipped ?? '', // (the loadout keeps the boat game's field name)
     engine: engineState.equipped ?? '',
     trail: trailState.equipped ?? '',
     partner: partnerState.equipped ?? '',
@@ -369,7 +370,7 @@ function syncGear() {
   const ek = `${gear.boat}|${gear.engine}`
   if (ek !== enginesKey) {
     enginesKey = ek
-    horse.setEngines(engineLooks.get(gear.engine) ?? null, boatEngines.get(gear.boat) ?? 1)
+    horse.setEngines(engineLooks.get(gear.engine) ?? null, horseEngines.get(gear.boat) ?? 1)
   }
   companions.setPets(gear.pets)
   companions.setPartner(gear.partner)
@@ -383,7 +384,7 @@ const round = (n) => Math.round(n * 100) / 100
 
 // Progress lives only on the server (net.js): it loads each window's part of the save into it
 // and saves the HUD's trophies + gems and every window's snapshot. Nothing is kept in the browser.
-initNet({ hud, stores: [rebirthWindow, petsWindow, engineWindow, boatsWindow, partnerWindow, giftsWindow, trailsScene, race, eggs, worlds] })
+initNet({ hud, stores: [rebirthWindow, petsWindow, engineWindow, horsesWindow, partnerWindow, giftsWindow, trailsScene, race, eggs, worlds] })
 
 // The plaza's leaderboards: the server's top lists + this player's ranks (on join, then every
 // minute), and this player's own live values on each board's bottom line.

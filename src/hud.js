@@ -1,7 +1,7 @@
 // The on-screen HUD, laid out after the reference screenshot (1920x992):
 //   top-centre   - race timer, 1st/2nd/3rd podium under it
 //   top-right    - round buttons (spin wheel, calendar)
-//   left         - CLAIM! pill + grid of menu tiles (Rebirth, Pets, Boats, ...)
+//   left         - CLAIM! pill + grid of menu tiles (Rebirth, Pets, Horses, ...)
 //   right        - trophies / wins, AUTO TRAIN / AUTO RACE, boosts
 //   bottom       - the three-row race distance bar with every racer's head
 // Everything is sized in reference pixels times --u (set on resize), so it keeps
@@ -69,7 +69,7 @@ function formatTime(ms) {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(r).padStart(3, '0')}`
 }
 
-// actions: { claim, daily (the calendar), rebirth, pets, boats, engine, partner, trail,
+// actions: { claim, daily (the calendar), rebirth, pets, horses, engine, partner, trail,
 // autoTrain(on), autoRace(on), boosts (the three boost circles) }, all optional; a menu
 // tile calls the action named after it.
 export function createHud(actions = {}) {
@@ -118,7 +118,7 @@ export function createHud(actions = {}) {
   grid.append(
     tile('rebirth', 'Rebirth', ICONS.rebirth, actions.rebirth),
     tile('pets', 'Pets', ICONS.pets, actions.pets),
-    tile('boats', 'Boats', ICONS.boats, actions.boats),
+    tile('horses', 'Horses', ICONS.horses, actions.horses),
     tile('engine', 'Engine', ICONS.engine, actions.engine),
     tile('partner', 'Partner', ICONS.partner, actions.partner),
     tile('trail', 'Trail', ICONS.trail, actions.trail),

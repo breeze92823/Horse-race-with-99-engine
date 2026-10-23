@@ -46,8 +46,8 @@ export const ICONS = {
   pets: svg(
     `<ellipse cx="32" cy="42" rx="14" ry="12" fill="#2a2a33" ${O}/><ellipse cx="14" cy="28" rx="6" ry="8" fill="#2a2a33" ${O}/><ellipse cx="25" cy="17" rx="6" ry="8" fill="#2a2a33" ${O}/><ellipse cx="39" cy="17" rx="6" ry="8" fill="#2a2a33" ${O}/><ellipse cx="50" cy="28" rx="6" ry="8" fill="#2a2a33" ${O}/>`,
   ),
-  boats: svg(
-    `<path d="M5 36h54l-7 14H14z" fill="#ff3b3b" ${O}/><path d="M5 36h54l-2 5H7z" fill="#fff"/><path d="M14 36l6-14h22l8 14z" fill="#fff" ${O}/><path d="M24 25h14l4 8H21z" fill="#5ac8ff" ${O}/><path d="M4 55c6-3 10 3 16 0s10-3 16 0 10 3 16 0 8-2 10 0" fill="none" stroke="#3a9cff" stroke-width="4" stroke-linecap="round"/>`,
+  horses: svg(
+    `<path d="M20 60c-3-14-1-28 8-40l2-12 7 8c9 0 16 7 20 17l3 9c1 4-3 7-7 5l-7-4c-4 1-6 6-4 17z" fill="#c07a3c" ${O}/><path d="M28 20c-9 11-12 25-9 40h-8c-3-15 1-30 12-42z" fill="#5a3418" ${O}/><path d="M50 35l7-1 1 8c1 4-3 7-7 5l-5-3z" fill="#8a5428"/><path d="M41 15c5 3 9 9 12 17" stroke="#fff" stroke-width="3.5" stroke-linecap="round" fill="none"/><path d="M36 25l10 14" stroke="#ff3b3b" stroke-width="3" stroke-linecap="round"/><circle cx="39" cy="24" r="3.5" fill="#1b1b2a"/><circle cx="54" cy="40" r="1.6" fill="#1b1b2a"/>`,
   ),
   engine: svg(
     `<path d="M32 4c10 8 13 20 11 34H21C19 24 22 12 32 4z" fill="#fff" ${O}/><path d="M32 4c5 4 8 9 9.5 15H22.5C24 13 27 8 32 4z" fill="#ff3b3b" ${O}/><circle cx="32" cy="27" r="5.5" fill="#3a9cff" ${O}/><path d="m21 30-9 12 10-1zM43 30l9 12-10-1z" fill="#ff3b3b" ${O}/><path d="M25 39c0 9 3 15 7 21 4-6 7-12 7-21z" fill="#ffb31a" ${O}/>`,

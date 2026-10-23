@@ -221,7 +221,7 @@ export const PLAZA = {
 
 // --- Shop stalls (shops.js) ---------------------------------------------------------
 // Either side of the spawn, fronts facing it: Eggs past the statue wall (east
-// view, +X) and Boats on the west side (-X). Items are listed left to right as
+// view, +X) and Horses on the west side (-X). Items are listed left to right as
 // seen from the front.
 export const SHOPS = {
   eggs: {
@@ -238,19 +238,19 @@ export const SHOPS = {
       { name: 'Rainbow Egg', price: 500e3, rainbow: true, pets: { fox: 50, panda: 40, dragon: 10 } },
     ],
   },
-  boats: {
+  horses: {
     x: -27,
     z: 12,
     yaw: Math.PI / 2, // front faces +X
     width: 21,
     depth: 7,
-    boatScale: 1.3,
-    boatAngle: 0.55, // rad each boat is turned from side-on toward the front
-    boats: [
+    horseScale: 1.9,
+    horseAngle: 0.55, // rad each horse is turned from side-on toward the front
+    horses: [
       // stat: the number under the name; fx: 'aura' (rising glow + sparkles) or 'fire'; glow: neon/particle colour
-      // id: the BOATS catalog boat it sells (interact.js).
-      { id: 'royalWave', name: 'ROYAL WAVE', kind: 'speedboat', color: '#2bd14a', labelColor: '#ff3b3b', bow: -1, stat: '1699', fx: 'aura', glow: '#3dff6a' },
-      { id: 'viking', name: 'VIKING SHIP', kind: 'viking', color: '#ffb21a', labelColor: '#ff3b3b', bow: 1, stat: '90', fx: 'fire', glow: '#ff8a1a' },
+      // id: the HORSES catalog horse it shows and sells (interact.js); facing: nose toward +X (1) or -X (-1).
+      { id: 'royalUnicorn', name: 'ROYAL UNICORN', labelColor: '#ff3b3b', facing: -1, stat: '1699', fx: 'aura', glow: '#3dff6a' },
+      { id: 'inferno', name: 'INFERNO NIGHTMARE', labelColor: '#ff3b3b', facing: 1, stat: '90', fx: 'fire', glow: '#ff8a1a' },
     ],
   },
 }
@@ -259,16 +259,16 @@ export const SHOPS = {
 // A glowing touch pad in front of each shop object; driving onto one opens its
 // window (once per visit: leave the pad to re-arm it). `open` names the window
 // main.js passes in; keep them on open sand (the pink walkway runs past the Eggs
-// stall's front, x > 17). Pets = the Eggs stall, Boats = the Boats stall, Engine =
+// stall's front, x > 17). Pets = the Eggs stall, Horses = the Horses stall, Engine =
 // the Engine Upgrade machine, Partner = the hero statues on the right walkway.
 export const HUB = {
-  radius: 2.6, // m: the pad's size and its trigger distance from the boat's centre
+  radius: 2.6, // m: the pad's size and its trigger distance from the horse's centre
   beamHeight: 1.8, // m of glowing light wall round the rim
   labelY: 3.4,
   labelHeight: 1.3,
   pads: [
     { open: 'pets', name: 'PETS', x: 14.2, z: 12, color: '#ffd21a' },
-    { open: 'boats', name: 'BOATS', x: -19.6, z: 12, color: '#3dff6a' },
+    { open: 'horses', name: 'HORSES', x: -19.6, z: 12, color: '#3dff6a' },
     { open: 'engine', name: 'ENGINES', x: -15.6, z: -12.5, color: '#3ff0ff' },
     { open: 'partner', name: 'PARTNERS', x: 15.2, z: -12, color: '#ff5fd8' },
   ],
@@ -276,11 +276,11 @@ export const HUB = {
 
 // --- Interact prompts (interact.js) ---------------------------------------------------
 // Near a shop object, a prompt over it says what E (or a tap on the prompt) does:
-// hatch an egg, buy / equip a display boat, rocket engine or statue partner,
+// hatch an egg, buy / equip a display horse, rocket engine or statue partner,
 // upgrade to the next ladder engine, or open a hub pad's window. The nearest
 // object in range wins. Radii are m (ground distance) from the object's centre.
 export const INTERACT = {
-  radius: { egg: 9, boat: 8, upgrade: 6.5, rocket: 5, statue: 5 },
+  radius: { egg: 9, horse: 8, upgrade: 6.5, rocket: 5, statue: 5 },
   toastSeconds: 1.8,
 }
 
@@ -303,44 +303,48 @@ export const EGG_HATCH = {
   rarityColor: { common: '#e4e8f0', uncommon: '#6ee36e', rare: '#59b8ff', epic: '#c77dff', legendary: '#ffc93a' },
 }
 
-// --- Boats window (boats.js) + catalog models (boatModels.js) ----------------------
-// The whole boat inventory, in window order (4 per row), from the Boats reference
-// shots. Every boat is bought with Wins (the HUD's trophy counter); only the
-// Wooden Raft is free (price null). wins / luck / acc are % boosts, engines the
-// rocket xN; `rarity` colours the tile, preview and name. The first two were
-// Robux boats in the reference: their Wins price comes from where their stats
-// land on the ladder (Viking Ship ~ between the 11B and 88B boats; Royal Wave
-// beats Sailing Ship Big on every stat). `model` = colours/options for the
-// builder named by `kind` (boatModels.js).
-export const BOATS = {
+// --- Horses window (horses.js) + catalog looks (horseModels.js) ---------------------
+// The whole horse inventory, in window order (4 per row), in the slots of the boat
+// game's Boats reference: same prices, stats and booster counts. Every horse is
+// bought with Wins (the HUD's trophy counter); only the Brown Pony is free (price
+// null). wins / luck / acc are % boosts, engines the rocket xN; `rarity` colours the
+// tile, preview and name. The first two were Robux items in the reference: their
+// Wins price comes from where their stats land on the ladder.
+export const HORSES = {
   preloadDelayMs: 4000, // tile pictures start drawing this long after boot
-  start: { owned: ['raft'], equipped: 'raft' },
+  start: { owned: ['pony'], equipped: 'pony' },
   rarity: { premium: '#ff5b37', common: '#d4d4d4', uncommon: '#62d65c', rare: '#2ba8f4', epic: '#ec5fc0', legendary: '#ffc61f' },
-  // Boat name colour on the blue card, per rarity.
+  // Horse name colour on the blue card, per rarity.
   nameColor: { premium: '#ff5b37', common: '#e4e4e4', uncommon: '#7dff6a', rare: '#bfeaff', epic: '#ff9ce0', legendary: '#ffd52e' },
+  // The 20 horses, in grid order: two premium horses (priced from their stats), then the ladder.
+  // Only the Brown Pony is free. stats are % boosts (wins, luck, acc); engines = rocket boosters
+  // carried (x the equipped engine's boosts, boosts.js). look dresses the model (horseModels.js):
+  // colours (coat, mane = one or a list per tuft, tail, muzzle, hoof, blaze, sock(s), blanket, trim,
+  // saddle) and extras (size, ears, horn, wings, armor, stripes, spots, feathers, maneGlow, eyesGlow,
+  // hornGlow, shine = metallic coat).
   list: [
-    { id: 'viking', name: 'Viking Ship', kind: 'viking', rarity: 'premium', price: 50e9, wins: 300, luck: 60, acc: 300, engines: 5, model: { color: '#d42a1c', head: '#d42a1c', deck: '#6a3a1c', stripes: '#ffcf1f', mane: ['#ffcf1f'], shields: ['#ffcf1f', '#d42a1c'] } },
-    { id: 'royalWave', name: 'Royal Wave', kind: 'speedboat', rarity: 'premium', price: 1e18, wins: 1200, luck: 150, acc: 800, engines: 8, model: { color: '#0d1f10', deck: '#1d5a26', engine: '#0d1f10', band: '#3dff4a', neon: '#3dff4a' } },
-    { id: 'raft', name: 'Wooden Raft', kind: 'raft', rarity: 'common', price: null, wins: 10, luck: 5, acc: 20, engines: 1, model: { color: '#b07440' } },
-    { id: 'canoe', name: 'Canadian Canoe', kind: 'canoe', rarity: 'common', price: 200, wins: 20, luck: 7, acc: 50, engines: 1, model: { color: '#ffc21a', inner: '#e3a40e', rim: '#ffd84a', seat: '#c98a0c' } },
-    { id: 'rowboat', name: 'Rowboat', kind: 'rowboat', rarity: 'common', price: 1e3, wins: 30, luck: 9, acc: 70, engines: 1, model: { color: '#5f636b', inner: '#9ea3ab' } },
-    { id: 'jetski', name: 'Jet Ski', kind: 'jetski', rarity: 'common', price: 5e3, wins: 45, luck: 12, acc: 95, engines: 2, model: { color: '#1d2f63', seat: '#c8262b' } },
-    { id: 'armyDinghy', name: 'Army Dinghy', kind: 'dinghy', rarity: 'uncommon', price: 40e3, wins: 65, luck: 15, acc: 120, engines: 2, model: { tube: '#4c5a2c', floor: '#2b3419' } },
-    { id: 'nightDinghy', name: 'Night Dinghy', kind: 'dinghy', rarity: 'uncommon', price: 320e3, wins: 90, luck: 19, acc: 150, engines: 2, model: { tube: '#26272d', floor: '#a8561a' } },
-    { id: 'tealConsole', name: 'Teal Console', kind: 'console', rarity: 'uncommon', price: 2.6e6, wins: 120, luck: 24, acc: 185, engines: 3, model: { color: '#13857a', deck: '#0d5a52' } },
-    { id: 'redSailboat', name: 'Red Sailboat', kind: 'sailboat', rarity: 'uncommon', price: 21e6, wins: 150, luck: 29, acc: 220, engines: 3, model: { color: '#b8242a', sail: '#2a2a33', deck: '#3a3a42' } },
-    { id: 'navyCruiser', name: 'Navy Cruiser', kind: 'cruiser', rarity: 'rare', price: 170e6, wins: 185, luck: 34, acc: 260, engines: 3, model: { color: '#25335a', cabin: '#3b4a78' } },
-    { id: 'tugboat', name: 'Tugboat', kind: 'tug', rarity: 'rare', price: 1.4e9, wins: 225, luck: 40, acc: 300, engines: 4, model: { color: '#b83a2c', cabin: '#f4f4f4' } },
-    { id: 'woodenSailboat', name: 'Wooden Sailboat', kind: 'sailboat', rarity: 'rare', price: 11e9, wins: 270, luck: 46, acc: 340, engines: 4, model: { color: '#7a4a26', sail: '#8c8378', deck: '#a06a3a', masts: 2 } },
-    { id: 'navyYacht', name: 'Navy Yacht', kind: 'cruiser', rarity: 'rare', price: 88e9, wins: 320, luck: 52, acc: 380, engines: 4, model: { color: '#24427e', cabin: '#1d3466', rail: '#cfd6e0' } },
-    { id: 'steelSailer', name: 'Steel Sailer', kind: 'sailboat', rarity: 'epic', price: 700e9, wins: 375, luck: 58, acc: 420, engines: 5, model: { color: '#6c7079', sail: '#3c3f46', deck: '#8a8f98', cabin: '#55595f' } },
-    { id: 'harborFerry', name: 'Harbor Ferry', kind: 'tug', rarity: 'epic', price: 5.6e12, wins: 430, luck: 63, acc: 455, engines: 5, model: { color: '#26272c', cabin: '#ffcc22', roof: '#2a2b30', decks: 2, tires: true } },
-    { id: 'shadowYacht', name: 'Shadow Yacht', kind: 'cruiser', rarity: 'epic', price: 45e12, wins: 480, luck: 68, acc: 480, engines: 5, model: { color: '#3a3d45', cabin: '#2a2c33', rail: '#8a8f98' } },
-    { id: 'pirateShip', name: 'Pirate Ship', kind: 'galleon', rarity: 'epic', price: 360e12, wins: 530, luck: 72, acc: 500, engines: 5, model: { color: '#5a3418', deck: '#7a4a24', sail: '#17171b', trim: '#3a2210', masts: 2, skull: true } },
-    { id: 'blackGalleon', name: 'Black Galleon', kind: 'galleon', rarity: 'legendary', price: 2.9e15, wins: 565, luck: 76, acc: 515, engines: 6, model: { color: '#1e1f24', deck: '#3a2a1c', sail: '#232428', trim: '#d8a21a', masts: 3 } },
-    { id: 'sailingShipBig', name: 'Sailing Ship Big', kind: 'galleon', rarity: 'legendary', price: 23e15, wins: 600, luck: 80, acc: 530, engines: 6, model: { color: '#8a5428', deck: '#b07a44', sail: '#2f9df0', trim: '#5a3418', masts: 3 } },
+    { id: 'inferno', name: 'Inferno Nightmare', rarity: 'premium', price: 50e9, wins: 300, luck: 60, acc: 300, engines: 5, look: { coat: '#1b1518', mane: ['#ff3a12', '#ff8a1a', '#ffd23a'], maneGlow: true, eyesGlow: '#ff6a1a', muzzle: '#241c1f', hoof: '#ff5a1a', blaze: false, blanket: '#2a2226', trim: '#ff6a1a', saddle: '#3a2a22' } },
+    { id: 'royalUnicorn', name: 'Royal Unicorn', rarity: 'premium', price: 1e18, wins: 1200, luck: 150, acc: 800, engines: 8, look: { coat: '#f4fbf6', mane: ['#3dff4a', '#a8ffb0'], maneGlow: true, horn: '#3dff4a', hornGlow: true, muzzle: '#e2efe6', hoof: '#c9a43a', blaze: false, blanket: '#0d1f10', trim: '#3dff4a', saddle: '#1d5a26', size: 1.08 } },
+    { id: 'pony', name: 'Brown Pony', rarity: 'common', price: null, wins: 10, luck: 5, acc: 20, engines: 1, look: { size: 0.86 } },
+    { id: 'palomino', name: 'Palomino', rarity: 'common', price: 200, wins: 20, luck: 7, acc: 50, engines: 1, look: { coat: '#e0ab4f', mane: '#fbf0d2', muzzle: '#c78e3a', blanket: '#2f8ad8' } },
+    { id: 'greyMare', name: 'Dapple Grey', rarity: 'common', price: 1e3, wins: 30, luck: 9, acc: 70, engines: 1, look: { coat: '#9da3ab', mane: '#4a4e55', muzzle: '#6e737b', blaze: false, spots: { color: '#c9ced4', where: 'all', count: 22, size: 0.08 }, blanket: '#5a2e8a' } },
+    { id: 'donkey', name: 'Speedy Donkey', rarity: 'common', price: 5e3, wins: 45, luck: 12, acc: 95, engines: 2, look: { coat: '#8a8178', mane: '#3a3532', muzzle: '#e8e2d8', ears: 'long', blaze: false, size: 0.84, blanket: '#c8262b' } },
+    { id: 'mustang', name: 'Wild Mustang', rarity: 'uncommon', price: 40e3, wins: 65, luck: 15, acc: 120, engines: 2, look: { coat: '#c4894a', mane: '#1d1714', muzzle: '#8a5a2e', socks: true, sock: '#2a211c', blaze: false, blanket: '#4c5a2c', trim: '#c9b45a' } },
+    { id: 'blackStallion', name: 'Black Stallion', rarity: 'uncommon', price: 320e3, wins: 90, luck: 19, acc: 150, engines: 2, look: { coat: '#1f1d22', mane: '#0d0c0f', muzzle: '#2c2a30', blaze: '#f2ece0', blanket: '#a8561a', trim: '#f2ece0' } },
+    { id: 'appaloosa', name: 'Appaloosa', rarity: 'uncommon', price: 2.6e6, wins: 120, luck: 24, acc: 185, engines: 3, look: { coat: '#f3eee4', mane: '#4a3424', muzzle: '#8a6a52', blaze: false, spots: { color: '#6b4428', count: 18, size: 0.075 }, blanket: '#13857a' } },
+    { id: 'arabian', name: 'Red Arabian', rarity: 'uncommon', price: 21e6, wins: 150, luck: 29, acc: 220, engines: 3, look: { coat: '#a8411f', mane: '#f0c98a', muzzle: '#7a2e16', socks: true, blanket: '#2a2a33', trim: '#ffcf3a', size: 0.96 } },
+    { id: 'zebra', name: 'Zebra', rarity: 'rare', price: 170e6, wins: 185, luck: 34, acc: 260, engines: 3, look: { coat: '#f6f6f2', mane: ['#16161a', '#f6f6f2'], tail: '#16161a', muzzle: '#2a2a2e', blaze: false, stripes: { color: '#16161a' }, blanket: '#25335a' } },
+    { id: 'clydesdale', name: 'Clydesdale', rarity: 'rare', price: 1.4e9, wins: 225, luck: 40, acc: 300, engines: 4, look: { coat: '#6b3a1e', mane: '#1d140f', muzzle: '#4a2814', socks: true, feathers: true, size: 1.16, blanket: '#b83a2c' } },
+    { id: 'thoroughbred', name: 'Racing Thoroughbred', rarity: 'rare', price: 11e9, wins: 270, luck: 46, acc: 340, engines: 4, look: { coat: '#5a2e18', mane: '#151110', muzzle: '#3d1f10', socks: true, blanket: '#f4f4f4', trim: '#2f9df0', size: 1.04 } },
+    { id: 'knight', name: "Knight's Charger", rarity: 'rare', price: 88e9, wins: 320, luck: 52, acc: 380, engines: 4, look: { coat: '#e9e6e0', mane: '#8a8f98', muzzle: '#bdb8b0', blaze: false, armor: { plate: '#b9c1cc', cloth: '#24427e', trim: '#ffd23a' }, blanket: '#24427e', size: 1.06 } },
+    { id: 'mecha', name: 'Mecha Horse', rarity: 'epic', price: 700e9, wins: 375, luck: 58, acc: 420, engines: 5, look: { coat: '#7c828c', mane: ['#3aa6ff', '#9ae0ff'], maneGlow: true, eyesGlow: '#4ad8ff', muzzle: '#4a4f57', hoof: '#33373d', blaze: false, stripes: { color: '#3ad8ff', kind: 'seams' }, shine: 0.75, blanket: '#3c3f46', trim: '#3ad8ff', saddle: '#2a2c33' } },
+    { id: 'skeleton', name: 'Skeleton Horse', rarity: 'epic', price: 5.6e12, wins: 430, luck: 63, acc: 455, engines: 5, look: { coat: '#ece6d4', mane: '#2a2b30', muzzle: '#d6cfba', hoof: '#2a2b30', blaze: false, eyesGlow: '#7aff4a', stripes: { color: '#3a3b40', kind: 'ribs' }, blanket: '#26272c', trim: '#ffcc22' } },
+    { id: 'pegasus', name: 'Pegasus', rarity: 'epic', price: 45e12, wins: 480, luck: 68, acc: 480, engines: 5, look: { coat: '#f7f8fc', mane: ['#9fd8ff', '#d6eeff'], muzzle: '#e4e7f0', hoof: '#c9a43a', blaze: false, wings: '#ffffff', wingTips: '#cfe9ff', blanket: '#3a6ad8', trim: '#ffd23a' } },
+    { id: 'galaxy', name: 'Galaxy Steed', rarity: 'epic', price: 360e12, wins: 530, luck: 72, acc: 500, engines: 5, look: { coat: '#2a1452', mane: ['#d06bff', '#5ab8ff', '#ff8af3'], maneGlow: true, eyesGlow: '#ffffff', muzzle: '#1d0e3a', hoof: '#d06bff', blaze: false, spots: { color: '#ffffff', where: 'all', count: 26, size: 0.035, glow: true }, blanket: '#17171b', trim: '#d06bff' } },
+    { id: 'golden', name: 'Golden Stallion', rarity: 'legendary', price: 2.9e15, wins: 565, luck: 76, acc: 515, engines: 6, look: { coat: '#f2b818', mane: ['#fff2a8', '#ffd84a'], maneGlow: true, muzzle: '#d99a10', hoof: '#fff2a8', blaze: false, shine: 0.85, blanket: '#1e1f24', trim: '#d8a21a', saddle: '#3a2a1c', size: 1.08 } },
+    { id: 'rainbowAlicorn', name: 'Rainbow Alicorn', rarity: 'legendary', price: 23e15, wins: 600, luck: 80, acc: 530, engines: 6, look: { coat: '#fdf6ff', mane: ['#ff3b3b', '#ff9a1a', '#ffe11a', '#3ddc4a', '#2f9df0', '#a05aff'], maneGlow: true, horn: '#ffe9a8', hornGlow: true, wings: '#ffffff', wingTips: '#ffc8f4', muzzle: '#f0e4f6', hoof: '#c9a43a', blaze: false, blanket: '#2f9df0', trim: '#ffe11a', size: 1.1 } },
   ],
-  thumb: { width: 256, height: 320, outline: 7, budgetMs: 12 }, // px of each rendered tile picture, ms of drawing per frame (boatThumbs.js)
+  thumb: { width: 256, height: 320, outline: 7, budgetMs: 12 }, // px of each rendered tile picture, ms of drawing per frame (horseThumbs.js)
 }
 
 // A small rocky islet with palms out at sea, seen past the stall in the east view.
@@ -364,6 +368,7 @@ export const HORSE = {
   engineBand: '#8dff6a',
   flame: '#38d7ff',
   flameGlow: 3, // HDR multiplier on the engine flames when bloom is on (propkit neon)
+  glow: 1.5, // HDR multiplier on a horse's glowing mane / eyes / horn / seams with bloom on
   engineScale: 0.66, // boosters are a bit smaller than the lobby's parked engines
   // Gaits (horse.js): walk -> trot over toTrot m/s, trot -> gallop over toGallop; one cycle per
   // `stride` m (rate clamped to minRate..maxRate Hz). Per gait: duty = share of the cycle a hoof is
@@ -927,8 +932,15 @@ export const RACE = {
       duck: { weight: 1, x: [32, 60] },
       dolphins: { weight: 2.5, x: [25, 31] },
     },
-    // Anchored ships: catalog boat id and length (m).
-    ships: [['pirateShip', 30], ['blackGalleon', 34], ['sailingShipBig', 32], ['woodenSailboat', 18], ['harborFerry', 22], ['navyYacht', 20]],
+    // Anchored ships: boatModels.js spec ({ kind, model colours }) and length (m).
+    ships: [
+      [{ kind: 'galleon', model: { color: '#5a3418', deck: '#7a4a24', sail: '#17171b', trim: '#3a2210', masts: 2, skull: true } }, 30],
+      [{ kind: 'galleon', model: { color: '#1e1f24', deck: '#3a2a1c', sail: '#232428', trim: '#d8a21a', masts: 3 } }, 34],
+      [{ kind: 'galleon', model: { color: '#8a5428', deck: '#b07a44', sail: '#2f9df0', trim: '#5a3418', masts: 3 } }, 32],
+      [{ kind: 'sailboat', model: { color: '#7a4a26', sail: '#8c8378', deck: '#a06a3a', masts: 2 } }, 18],
+      [{ kind: 'tug', model: { color: '#26272c', cabin: '#ffcc22', roof: '#2a2b30', decks: 2, tires: true } }, 22],
+      [{ kind: 'cruiser', model: { color: '#24427e', cabin: '#1d3466', rail: '#cfd6e0' } }, 20],
+    ],
     balloons: [['#ff3b3b', '#ffe11a'], ['#2f9df0', '#ffffff'], ['#a01aff', '#3ff0d0', '#ffb21a'], ['#22d34a', '#ffffff', '#ff4a1a']],
     rainbow: ['#ff2a2a', '#ff8a1a', '#ffe11a', '#22d34a', '#1a9cff', '#3a3cff', '#a01aff'],
   },

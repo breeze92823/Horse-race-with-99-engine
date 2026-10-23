@@ -1,9 +1,7 @@
 import {
   AdditiveBlending,
-  Box3,
   BoxGeometry,
   CanvasTexture,
-  CatmullRomCurve3,
   Color,
   ConeGeometry,
   CylinderGeometry,
@@ -18,11 +16,11 @@ import {
   Sprite,
   SpriteMaterial,
   TorusGeometry,
-  TubeGeometry,
   Vector3,
 } from 'three'
 import { SHOPS } from './config.js'
-import { makeSpeedboat, makeViking } from './boatModels.js'
+import { createHorse } from './horse.js'
+import { horseLook } from './horseModels.js'
 import { createEmitter } from './particles.js'
 import { paintQuilt, paintSoftDot } from './textures.js'
 import { label, neon, put, solidBox, std } from './propkit.js'
@@ -33,10 +31,10 @@ import { label, neon, put, solidBox, std } from './propkit.js'
 //  - Eggs (east, SHOPS.eggs): light counter wall, dark upper panels with the
 //    yellow "Eggs" sign, four eggs (yellow, spiky gold, green, rainbow)
 //    turning on pedestals under trophy prices
-//  - Boats (west, SHOPS.boats): an open back behind a white parapet, and two
-//    boats on display with name + stat tags: the green ROYAL WAVE speedboat
-//    wrapped in a glowing green aura, and the golden VIKING SHIP on fire
-//    (neon hull rims, a glow pool on the floor, particles)
+//  - Horses (west, SHOPS.horses): an open back behind a white parapet, and two
+//    premium horses on display (idling) with name + stat tags: the ROYAL
+//    UNICORN wrapped in a glowing green aura, and the INFERNO NIGHTMARE on fire
+//    (a neon ring and a glow pool on the floor, particles)
 // Each stall is built in local space with its front toward +Z, then turned by
 // its yaw so the front faces the spawn.
 const PH = 0.5 // platform height
@@ -177,28 +175,12 @@ function createEggStall(scene, spec, animated, spots) {
   })
 }
 
-// --- Boats ------------------------------------------------------------------------------
-// The two display boats come from the Boats catalog models (boatModels.js).
-const BOAT_MODELS = { speedboat: makeSpeedboat, viking: makeViking }
-// Deck outline of each model (half beam, half length), for its neon rim.
-const DECK = { speedboat: [1.5, 4.4], viking: [1.5, 4.2] }
-
-// A glowing tube following the deck edge (pinched ellipse, like the hulls).
-function neonRim(kind) {
-  const [beam, half] = DECK[kind]
-  const pts = []
-  for (let i = 0; i < 48; i++) {
-    const a = (i / 48) * Math.PI * 2
-    const z = Math.cos(a)
-    pts.push(new Vector3(Math.sin(a) * beam * (1 - 0.45 * z * z) * 1.02, 0.06, z * half * 1.01))
-  }
-  return new TubeGeometry(new CatmullRomCurve3(pts, true), 96, 0.07, 6, true)
-}
-
-// Particles around one display boat: a rising aura with sparkles, or fire with embers.
-function boatFx(scene, boat, b) {
-  const at = boat.getWorldPosition(new Vector3())
-  const box = (color, sy = 0.3) => ({ x: at.x, y: at.y - 0.6, z: at.z, sx: 2.6, sy, sz: 2.6, color })
+// --- Horses ------------------------------------------------------------------------------
+// Particles around one display horse: a rising aura with sparkles, or fire with embers off its
+// body and mane.
+function horseFx(scene, horse, b, scale) {
+  const at = horse.getWorldPosition(new Vector3())
+  const box = (color, sy = 0.3) => ({ x: at.x, y: at.y + 0.4, z: at.z, sx: 2.2, sy, sz: 2.2, color })
   if (b.fx === 'aura') {
     createEmitter(scene, {
       boxes: [box(b.glow)], count: 110, life: 1.5, velocity: [0, 1.5, 0], spread: [0.7, 0.5, 0.7],
@@ -209,9 +191,10 @@ function boatFx(scene, boat, b) {
       size: 0.45, intensity: 3, twinkle: 7, sprite: 'sparkle', seed: 52,
     })
   } else if (b.fx === 'fire') {
-    const head = boat.localToWorld(new Vector3(0, 3.1, 4.5))
+    const mane = horse.localToWorld(new Vector3(0, 1.9, 0.9)) // the neck's crest, in model units
+    const back = { x: at.x, y: at.y + 1.6 * scale, z: at.z, sx: 1.2, sy: 0.3, sz: 1.2, color: '#ff5a1a' }
     createEmitter(scene, {
-      boxes: [box('#ff5a1a'), box('#ffb21a'), box('#ff2a1a'), { x: head.x, y: head.y, z: head.z, sx: 0.4, sy: 0.3, sz: 0.4, color: '#ffd24a' }],
+      boxes: [box('#ff5a1a'), box('#ffb21a'), back, { x: mane.x, y: mane.y, z: mane.z, sx: 0.4, sy: 0.3, sz: 0.4, color: '#ffd24a' }],
       count: 140, life: 0.95, velocity: [0, 2.6, 0], spread: [0.6, 0.9, 0.6],
       size: 0.95, grow: 0.15, intensity: 3.5, opacity: 0.8, seed: 53,
     })
@@ -222,7 +205,8 @@ function boatFx(scene, boat, b) {
   }
 }
 
-function createBoatStall(scene, spec, spots) {
+// The two premium horses (horse.js, no rider or boosters) standing on the stall floor, idling.
+function createHorseStall(scene, spec, spots, animated) {
   const { g, backZ } = stall(scene, spec)
   const W = spec.width
   // Open back: a white parapet under the top beam.
@@ -231,44 +215,44 @@ function createBoatStall(scene, spec, spots) {
   put(g, new BoxGeometry(W, 0.3, 0.4), white, 0, PH + 4.3, backZ)
   const glowTex = new CanvasTexture(paintSoftDot(128))
   glowTex.colorSpace = SRGBColorSpace
-  const spacing = W / spec.boats.length
-  const boats = []
-  spec.boats.forEach((b, i) => {
-    const x = (i - (spec.boats.length - 1) / 2) * spacing
-    const boat = BOAT_MODELS[b.kind]({ color: b.color })
-    boat.add(new Mesh(neonRim(b.kind), neon(b.glow)))
-    boat.scale.setScalar(spec.boatScale)
-    // Bow toward +X (1) or -X (-1), turned partly toward the front so it shows three-quarters.
-    const bow = b.bow ?? 1
-    boat.rotation.y = bow * (Math.PI / 2 - spec.boatAngle)
-    // Rest the keel on the floor.
-    boat.position.set(x, 0, 0.3)
-    g.add(boat)
-    g.updateMatrixWorld(true)
-    const bounds = new Box3().setFromObject(boat)
-    boat.position.y = PH + 0.05 - (bounds.min.y - g.position.y)
-    // Glow pool on the floor under it.
-    const pool = put(g, new PlaneGeometry(6, 11), new MeshBasicMaterial({ map: glowTex, color: b.glow, transparent: true, opacity: 0.55, blending: AdditiveBlending, depthWrite: false }), x, PH + 0.03, 0.3, false)
-    pool.rotation.set(-Math.PI / 2, 0, boat.rotation.y)
+  const spacing = W / spec.horses.length
+  const shown = []
+  spec.horses.forEach((b, i) => {
+    const x = (i - (spec.horses.length - 1) / 2) * spacing
+    const horse = createHorse({ engines: false })
+    const look = horseLook(b.id)
+    horse.setLook(look)
+    const root = horse.root
+    root.scale.setScalar(spec.horseScale)
+    // Nose toward +X (1) or -X (-1), turned partly toward the front so it shows three-quarters.
+    root.rotation.y = (b.facing ?? 1) * (Math.PI / 2 - spec.horseAngle)
+    root.position.set(x, PH + 0.02, 0.3)
+    g.add(root)
+    // A neon ring and a glow pool on the floor under it.
+    const ring = put(g, new TorusGeometry(2.6, 0.07, 6, 48), neon(b.glow), x, PH + 0.05, 0.3, false)
+    ring.rotation.x = -Math.PI / 2
+    const pool = put(g, new PlaneGeometry(6, 9), new MeshBasicMaterial({ map: glowTex, color: b.glow, transparent: true, opacity: 0.55, blending: AdditiveBlending, depthWrite: false }), x, PH + 0.03, 0.3, false)
+    pool.rotation.set(-Math.PI / 2, 0, root.rotation.y)
     const tag = label(`${b.name}\n⊕ ${b.stat}`, 0.85, { colors: [b.labelColor, '#7dff6a'], outline: '#1a0a14', font: '700 64px Fredoka, sans-serif', outlineWidth: 10 })
     tag.position.set(x, PH + 5.6, 0.3)
     g.add(tag)
-    boats.push([boat, b])
+    shown.push([root, b])
+    animated.push((t) => horse.update(1 / 60, 0, 0, t + i * 3.7))
   })
   g.updateMatrixWorld(true)
-  for (const [boat, b] of boats) {
-    boatFx(scene, boat, b)
-    const at = boat.getWorldPosition(new Vector3())
-    spots.push({ boat: b.id, x: at.x, y: at.y + 3, z: at.z })
+  for (const [root, b] of shown) {
+    horseFx(scene, root, b, spec.horseScale)
+    const at = root.getWorldPosition(new Vector3())
+    spots.push({ horse: b.id, x: at.x, y: at.y + 3, z: at.z })
   }
 }
 
 export function createShops(scene) {
   const animated = []
-  // Where each egg / display boat's interact prompt sits (interact.js).
-  const spots = { eggs: [], boats: [] }
+  // Where each egg / display horse's interact prompt sits (interact.js).
+  const spots = { eggs: [], horses: [] }
   createEggStall(scene, SHOPS.eggs, animated, spots.eggs)
-  createBoatStall(scene, SHOPS.boats, spots.boats)
+  createHorseStall(scene, SHOPS.horses, spots.horses, animated)
   return {
     spots,
     update(dt, elapsed) {

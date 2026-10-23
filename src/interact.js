@@ -9,7 +9,7 @@ import { anyWindowOpen, replay } from './uiWindow.js'
 // ("E  Sunny Egg / Hatch 🏆30"). E (or tapping the pill, the touch path) runs it:
 //  - eggs (Eggs stall): open that egg's window (eggs.js: odds, Open 1 / N, Auto,
 //    the hatch overlay)
-//  - display boats (Boats stall), rocket engines (pads), hero statues
+//  - display horses (Horses stall), rocket engines (pads), hero statues
 //    (partners): buy if not owned, then equip, straight from the world
 //  - Engine Upgrade machine: buy + equip the next ladder engine
 //  - hub pads (hub.js): open the pad's window again without driving off it
@@ -17,7 +17,7 @@ import { anyWindowOpen, replay } from './uiWindow.js'
 // pill docks centred just above the distance bars instead of over the object.
 // Not enough Wins = the pill shakes + "Need N more Wins!". Prompts are off
 // while racing / in the Trails scene (pos null) and while a window is open.
-// deps: { hud (getStat/setStat), lobby, shops (their `spots`), eggs (the egg window), boats,
+// deps: { hud (getStat/setStat), lobby, shops (their `spots`), eggs (the egg window), horses,
 // engine, partner (the windows' item/acquire APIs), windows (hub pad openers) }.
 const SUFFIXES = ['', 'K', 'M', 'B', 'T', 'Qa', 'Qi', 'Sx', 'Sp', 'Oc', 'No', 'Dc']
 export function short(n) {
@@ -31,7 +31,7 @@ export function short(n) {
   return `${n >= 100 ? Math.floor(n + 1e-6) : Math.floor(n * 10 + 1e-6) / 10}${SUFFIXES[i]}`
 }
 
-export function createInteract({ hud, lobby, shops, eggs, boats, engine, partner, windows }) {
+export function createInteract({ hud, lobby, shops, eggs, horses, engine, partner, windows }) {
   const wins = () => hud.getStat('trophies')
   const hotbar = hud.root.querySelector('.hud-bars')
 
@@ -98,7 +98,7 @@ export function createInteract({ hud, lobby, shops, eggs, boats, engine, partner
       run: () => eggs.open(spot),
     })
   }
-  for (const spot of shops.spots.boats) if (spot.boat) targets.push(shopTarget(spot, INTERACT.radius.boat, boats, spot.boat))
+  for (const spot of shops.spots.horses) if (spot.horse) targets.push(shopTarget(spot, INTERACT.radius.horse, horses, spot.horse))
   for (const spot of lobby.spots.rockets) if (spot.engine) targets.push(shopTarget(spot, INTERACT.radius.rocket, engine, spot.engine))
   for (const spot of lobby.spots.statues) if (spot.partner) targets.push(shopTarget(spot, INTERACT.radius.statue, partner, spot.partner))
   for (const spot of lobby.spots.upgrade) {

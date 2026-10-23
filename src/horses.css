@@ -1,24 +1,24 @@
-/* Boats window (boats.js) on the shared shell (uiWindow.css). Measured off the
-   Boats reference (1917x989): a 1093x647 frame, the blue boat card on the left,
+/* Horses window (horses.js) on the shared shell (uiWindow.css). Measured off the
+   Boats reference (1917x989): a 1093x647 frame, the blue horse card on the left,
    the 4-wide catalog grid on the right. Lengths are design px * --uiw-u.
    Portrait screens stack the card over a 3-wide grid. */
-.bt-window {
+.hs-window {
   --uiw-w: 1093;
   --uiw-h: 647;
 }
 /* The card and grid reach up under the title badge and the X: keep those on top. */
-.bt-window .uiw-title,
-.bt-window .uiw-close {
+.hs-window .uiw-title,
+.hs-window .uiw-close {
   z-index: 2;
 }
-.bt-window .uiw-body {
+.hs-window .uiw-body {
   position: relative;
   height: calc((var(--uiw-h) - 10) * var(--uiw-u));
   padding: 0;
 }
 
-/* --- Boat card ---------------------------------------------------------------------- */
-.bt-info {
+/* --- Horse card ---------------------------------------------------------------------- */
+.hs-info {
   position: absolute;
   left: calc(5 * var(--uiw-u));
   top: calc(7 * var(--uiw-u));
@@ -29,7 +29,7 @@
   border-radius: calc(26 * var(--uiw-u));
   color: #fff;
 }
-.bt-name {
+.hs-name {
   position: absolute;
   left: 0;
   right: 0;
@@ -39,11 +39,11 @@
   line-height: 1;
   white-space: nowrap;
   color: var(--nc, #fff);
-  z-index: 1; /* over a tall boat's sails */
+  z-index: 1; /* over a tall horse's wings and horn */
   --ow: 4;
 }
-/* Rarity-coloured box; tall boats rise out of its top, as in the reference. */
-.bt-preview {
+/* Rarity-coloured box; tall horses rise out of its top, as in the reference. */
+.hs-preview {
   position: absolute;
   left: calc(57 * var(--uiw-u));
   top: calc(86 * var(--uiw-u));
@@ -53,24 +53,24 @@
   border: max(1px, calc(3 * var(--uiw-u))) solid rgba(0, 0, 0, 0.08);
   border-radius: calc(26 * var(--uiw-u));
 }
-.bt-preview-pic {
+.hs-preview-pic {
   position: absolute;
   left: calc(-22 * var(--uiw-u));
   top: calc(-58 * var(--uiw-u));
   width: calc(278 * var(--uiw-u));
   height: calc(348 * var(--uiw-u));
 }
-.bt-pic,
-.bt-preview-pic {
+.hs-pic,
+.hs-preview-pic {
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.2s;
 }
-.bt-pic.ready,
-.bt-preview-pic.ready {
+.hs-pic.ready,
+.hs-preview-pic.ready {
   opacity: 1;
 }
-.bt-engines {
+.hs-engines {
   position: absolute;
   left: 0;
   right: 0;
@@ -83,21 +83,21 @@
   line-height: 1;
   --ow: 4;
 }
-.bt-rocket {
+.hs-rocket {
   width: calc(54 * var(--uiw-u));
   height: calc(54 * var(--uiw-u));
   transform: rotate(40deg);
 }
-.bt-rocket svg,
-.bt-lock svg,
-.bt-cur svg,
-.bt-check svg,
-.bt-cost-icon svg {
+.hs-rocket svg,
+.hs-lock svg,
+.hs-cur svg,
+.hs-check svg,
+.hs-cost-icon svg {
   display: block;
   width: 100%;
   height: 100%;
 }
-.bt-stats {
+.hs-stats {
   position: absolute;
   left: calc(21 * var(--uiw-u));
   top: calc(380 * var(--uiw-u));
@@ -106,16 +106,16 @@
   white-space: nowrap;
   --ow: 3.5;
 }
-.bt-stats .wins {
+.hs-stats .wins {
   color: #fff23a;
 }
-.bt-stats .luck {
+.hs-stats .luck {
   color: #5cff47;
 }
-.bt-stats .acc {
+.hs-stats .acc {
   color: #ff9e1a;
 }
-.bt-action {
+.hs-action {
   position: absolute;
   left: 0;
   right: 0;
@@ -125,33 +125,33 @@
   align-items: center;
   justify-content: center;
 }
-.bt-action [hidden] {
+.hs-action [hidden] {
   display: none;
 }
-.bt-equipped {
+.hs-equipped {
   font-size: calc(52 * var(--uiw-u));
   line-height: 1;
   --ow: 4.5;
 }
-.bt-btn {
+.hs-btn {
   width: calc(284 * var(--uiw-u));
 }
-/* Price button: light blue with a darker lip (the reference's locked-boat button). */
-.bt-window .uiw-btn.blue {
+/* Price button: light blue with a darker lip (the reference's locked-horse button). */
+.hs-window .uiw-btn.blue {
   --btn-lip: #0a64b4;
   background: linear-gradient(#5cd6ff, #27b4fa 45%, #1699ec);
 }
-.bt-cost {
+.hs-cost {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: calc(40 * var(--uiw-u));
 }
-.bt-cost-icon {
+.hs-cost-icon {
   width: calc(46 * var(--uiw-u));
   height: calc(46 * var(--uiw-u));
 }
-.bt-hint {
+.hs-hint {
   position: absolute;
   left: 0;
   right: 0;
@@ -166,12 +166,12 @@
   transition: opacity 0.2s;
   pointer-events: none;
 }
-.bt-hint.show {
+.hs-hint.show {
   opacity: 1;
 }
 
 /* --- Catalog grid --------------------------------------------------------------------- */
-.bt-grid {
+.hs-grid {
   position: absolute;
   left: calc(383 * var(--uiw-u));
   top: calc(7 * var(--uiw-u));
@@ -192,20 +192,20 @@
   scrollbar-width: thin;
   scrollbar-color: #8a8a8a transparent;
 }
-.bt-grid::-webkit-scrollbar {
+.hs-grid::-webkit-scrollbar {
   width: max(6px, calc(16 * var(--uiw-u)));
 }
-.bt-grid::-webkit-scrollbar-thumb {
+.hs-grid::-webkit-scrollbar-thumb {
   background: #8a8a8a;
   background-clip: padding-box;
   border: max(2px, calc(5 * var(--uiw-u))) solid transparent;
   border-radius: 99px;
 }
-.bt-grid::-webkit-scrollbar-track {
+.hs-grid::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.bt-tile {
+.hs-tile {
   position: relative;
   width: 100%;
   height: 100%;
@@ -221,23 +221,23 @@
   -webkit-tap-highlight-color: transparent;
   transition: transform 0.08s;
 }
-.bt-tile:active {
+.hs-tile:active {
   transform: scale(0.95);
 }
-/* Picking a boat you have not equipped rings it (the equipped one carries the tick). */
-.bt-tile.sel:not(.equipped) {
+/* Picking a horse you have not equipped rings it (the equipped one carries the tick). */
+.hs-tile.sel:not(.equipped) {
   box-shadow:
     0 0 0 max(2px, calc(5 * var(--uiw-u))) #fff,
     0 0 0 max(3px, calc(9 * var(--uiw-u))) var(--uiw-ink);
 }
-.bt-pic {
+.hs-pic {
   position: absolute;
   left: calc(-11 * var(--uiw-u));
   top: calc(-32 * var(--uiw-u));
   width: calc(168 * var(--uiw-u));
   height: calc(210 * var(--uiw-u));
 }
-.bt-lock {
+.hs-lock {
   position: absolute;
   left: calc(36 * var(--uiw-u));
   top: calc(33 * var(--uiw-u));
@@ -245,7 +245,7 @@
   height: calc(76 * var(--uiw-u));
   filter: drop-shadow(0 calc(3 * var(--uiw-u)) 0 rgba(0, 0, 0, 0.25));
 }
-.bt-price {
+.hs-price {
   position: absolute;
   left: calc(11 * var(--uiw-u));
   bottom: calc(5 * var(--uiw-u));
@@ -254,14 +254,14 @@
   white-space: nowrap;
   --ow: 3.5;
 }
-.bt-cur {
+.hs-cur {
   position: absolute;
   right: calc(8 * var(--uiw-u));
   bottom: calc(5 * var(--uiw-u));
   width: calc(44 * var(--uiw-u));
   height: calc(44 * var(--uiw-u));
 }
-.bt-check {
+.hs-check {
   position: absolute;
   right: calc(-12 * var(--uiw-u));
   top: calc(-14 * var(--uiw-u));
@@ -270,57 +270,57 @@
   display: none;
   filter: drop-shadow(0 calc(2 * var(--uiw-u)) 0 rgba(0, 0, 0, 0.25));
 }
-.bt-tile.owned .bt-lock,
-.bt-tile.owned .bt-price,
-.bt-tile.owned .bt-cur {
+.hs-tile.owned .hs-lock,
+.hs-tile.owned .hs-price,
+.hs-tile.owned .hs-cur {
   display: none;
 }
-.bt-tile.equipped .bt-check {
+.hs-tile.equipped .hs-check {
   display: block;
 }
 
 /* --- Portrait: card on top (picture left, details right), 3-wide grid below ----------- */
 @media (orientation: portrait) {
-  .bt-window {
+  .hs-window {
     --uiw-w: 600;
     --uiw-h: 880;
   }
-  .bt-info {
+  .hs-info {
     left: calc(7 * var(--uiw-u));
     width: calc(576 * var(--uiw-u));
     height: calc(380 * var(--uiw-u));
   }
-  .bt-name {
+  .hs-name {
     top: calc(18 * var(--uiw-u));
   }
-  .bt-preview {
+  .hs-preview {
     left: calc(22 * var(--uiw-u));
     top: calc(90 * var(--uiw-u));
     width: calc(230 * var(--uiw-u));
     height: calc(230 * var(--uiw-u));
   }
-  .bt-preview-pic {
+  .hs-preview-pic {
     left: calc(-24 * var(--uiw-u));
     top: calc(-60 * var(--uiw-u));
   }
-  .bt-engines {
+  .hs-engines {
     left: calc(270 * var(--uiw-u));
     top: calc(72 * var(--uiw-u));
     justify-content: flex-start;
   }
-  .bt-stats {
+  .hs-stats {
     left: calc(272 * var(--uiw-u));
     top: calc(128 * var(--uiw-u));
   }
-  .bt-action {
+  .hs-action {
     left: calc(262 * var(--uiw-u));
     right: calc(10 * var(--uiw-u));
     top: calc(262 * var(--uiw-u));
   }
-  .bt-hint {
+  .hs-hint {
     top: calc(348 * var(--uiw-u));
   }
-  .bt-grid {
+  .hs-grid {
     left: calc(7 * var(--uiw-u));
     top: calc(397 * var(--uiw-u));
     width: calc(576 * var(--uiw-u));

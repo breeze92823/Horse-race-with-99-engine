@@ -1,37 +1,18 @@
-import {
-  AdditiveBlending,
-  BoxGeometry,
-  CapsuleGeometry,
-  Color,
-  ConeGeometry,
-  CylinderGeometry,
-  DoubleSide,
-  Euler,
-  Float32BufferAttribute,
-  Group,
-  InstancedMesh,
-  Matrix4,
-  Mesh,
-  MeshStandardMaterial,
-  Object3D,
-  Quaternion,
-  SphereGeometry,
-  TorusGeometry,
-  Vector3,
-} from 'three'
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
+import { AdditiveBlending, BufferGeometry, ConeGeometry, CylinderGeometry, DoubleSide, Group, InstancedMesh, Mesh, MeshStandardMaterial, Object3D, SphereGeometry } from 'three'
 import { HORSE } from './config.js'
 import { createEmitter, removeEmitter } from './particles.js'
 import { neon } from './propkit.js'
 import { bake } from './bake.js'
+import { BODY_PIVOT, buildHorseParts, LEGS, NECK_PIVOT, TAIL_PIVOT } from './horseModels.js'
 
-// The player's horse (and every remote player's, remotePlayers.js): a blocky procedural horse
-// with a saddle, and rocket boosters on a rack behind it (the equipped engine's colours x the
-// mount's engine count), each with a flickering flame. Built facing +Z (the character's forward),
-// hooves on y = 0 (the player's feet). Every moving part (body, neck + head, tail, two segments per
-// leg) is ONE vertex-coloured mesh, so a horse costs ~11 draw calls plus its engines. The gait
-// (walk / trot / gallop, blended by speed) is posed procedurally in update(). The avatar rides on
-// `horse.rider`, inside the body, so it bobs and leans with it.
+// The player's horse (and every remote player's, remotePlayers.js; the shop stall's and the Horses
+// window's pictures): a blocky procedural horse (geometry and catalog looks: horseModels.js) with a
+// saddle, and rocket boosters on a rack behind it (the equipped engine's colours x the mount's
+// engine count), each with a flickering flame. Built facing +Z (the character's forward), hooves on
+// y = 0 (the player's feet). Every moving part (body, neck + head, tail, two segments per leg) is
+// ONE vertex-coloured mesh (plus one unlit mesh for any glowing bits), so a horse costs ~11 draw
+// calls plus its engines. The gait (walk / trot / gallop, blended by speed) is posed procedurally in
+// update(). The avatar rides on `horse.rider`, inside the body, so it bobs and leans with it.
 
 const std = (color, extra) => new MeshStandardMaterial({ color, roughness: 0.55, metalness: 0, ...extra })
 
@@ -97,160 +78,6 @@ export function disposeGroup(group) {
   })
 }
 
-// Until the horse catalog lands, the mount list is still the boat catalog (BOATS): each entry's
-// model colours dress the horse, so equipping one still changes how it looks.
-export function boatLook(entry) {
-  const m = entry?.model ?? {}
-  const coat = m.color ?? m.tube
-  if (!coat) return {}
-  return { coat, mane: '#' + new Color(coat).multiplyScalar(0.4).getHexString(), blanket: m.band ?? m.neon ?? m.stripes ?? m.seat ?? m.cabin ?? m.sail ?? m.rim }
-}
-
-// --- Model -----------------------------------------------------------------------
-// Pieces are written in horse space (metres, hooves at y = 0, nose +Z), then each part's merged
-// geometry is moved into its pivot's frame. All pieces carry a vertex colour.
-const M = new Matrix4()
-const Q = new Quaternion()
-const E = new Euler()
-const P = new Vector3()
-const S = new Vector3()
-function piece(list, geo, color, [x, y, z] = [0, 0, 0], [rx, ry, rz] = [0, 0, 0], [sx, sy, sz] = [1, 1, 1]) {
-  const g = geo.index ? geo.toNonIndexed() : geo
-  if (g !== geo) geo.dispose()
-  g.deleteAttribute('uv')
-  M.compose(P.set(x, y, z), Q.setFromEuler(E.set(rx, ry, rz)), S.set(sx, sy, sz))
-  g.applyMatrix4(M)
-  const c = new Color(color)
-  const n = g.attributes.position.count
-  const colors = new Float32Array(n * 3)
-  for (let i = 0; i < n; i++) colors.set([c.r, c.g, c.b], i * 3)
-  g.setAttribute('color', new Float32BufferAttribute(colors, 3))
-  list.push(g)
-}
-function merged(list, [ox, oy, oz]) {
-  const g = mergeGeometries(list)
-  for (const p of list) p.dispose()
-  g.translate(-ox, -oy, -oz)
-  return g
-}
-const ball = (r = 1, w = 14, h = 10) => new SphereGeometry(r, w, h)
-const box = (x, y, z) => new BoxGeometry(x, y, z)
-
-// Body-part pivots (horse space). The legs hang from their shoulders / hips.
-const D = HORSE.dims
-const BODY_PIVOT = [0, D.barrelY, 0]
-const NECK_PIVOT = [0, D.barrelY + 0.2, D.barrelLength / 2 - 0.12]
-const TAIL_PIVOT = [0, D.barrelY + 0.24, -D.barrelLength / 2 - 0.08]
-const NECK_TILT = 0.62 // rad the neck leans forward from upright
-const HEAD_TILT = 0.85 // rad the face points down from level
-const LEG_X = D.barrelWidth / 2 - 0.15
-const LEGS = [
-  // side (+X = the horse's left), front?, hoof phase in each gait's cycle: walk, trot, gallop
-  { side: 1, front: true, offset: [0.25, 0, 0.45] },
-  { side: -1, front: true, offset: [0.75, 0.5, 0.57] },
-  { side: 1, front: false, offset: [0, 0.5, 0] },
-  { side: -1, front: false, offset: [0.5, 0, 0.12] },
-]
-
-function buildParts(look) {
-  const L = { ...HORSE.look, ...look }
-  const bw = D.barrelWidth / 2
-  const by = D.barrelY
-  const bl = D.barrelLength / 2
-
-  // Body: barrel, chest and rump, saddle, blanket, girth, stirrups, saddle bags, booster rack.
-  const body = []
-  piece(body, ball(1, 18, 12), L.coat, [0, by, 0], [0, 0, 0], [bw, D.barrelHeight / 2, bl])
-  piece(body, ball(1, 16, 12), L.coat, [0, by + 0.04, bl - 0.3], [0, 0, 0], [bw * 1.04, D.barrelHeight / 2 + 0.04, 0.48])
-  piece(body, ball(1, 16, 12), L.coat, [0, by + 0.06, -bl + 0.3], [0, 0, 0], [bw * 1.08, D.barrelHeight / 2 + 0.05, 0.5])
-  const top = by + D.barrelHeight / 2
-  piece(body, box(bw * 2 + 0.06, 0.05, 0.8), L.blanket, [0, top - 0.02, D.saddleZ], [0, 0, 0], [1, 1, 1])
-  piece(body, box(bw * 2 + 0.1, 0.06, 0.06), L.trim, [0, top - 0.02, D.saddleZ + 0.38])
-  piece(body, box(bw * 2 + 0.1, 0.06, 0.06), L.trim, [0, top - 0.02, D.saddleZ - 0.38])
-  piece(body, ball(1, 14, 8), L.saddle, [0, top + 0.03, D.saddleZ], [0, 0, 0], [0.3, 0.08, 0.36])
-  piece(body, box(0.18, 0.16, 0.1), L.saddle, [0, top + 0.1, D.saddleZ + 0.3]) // pommel
-  piece(body, box(0.42, 0.14, 0.08), L.saddle, [0, top + 0.08, D.saddleZ - 0.32]) // cantle
-  piece(body, new TorusGeometry(bw + 0.015, 0.035, 6, 24), L.leather, [0, by, D.saddleZ + 0.12], [0, 0, 0], [1, D.barrelHeight / D.barrelWidth, 1])
-  for (const s of [1, -1]) {
-    // Stirrup leathers and irons, where the rider's feet hang (ANIM.ride).
-    piece(body, box(0.04, 0.34, 0.06), L.leather, [s * (bw + 0.02), top - 0.12, D.saddleZ + 0.08], [0, 0, s * 0.35])
-    piece(body, new TorusGeometry(0.075, 0.02, 6, 12), L.metal, [s * (bw + 0.1), top - 0.34, D.saddleZ + 0.14], [0, Math.PI / 2, 0])
-    piece(body, box(0.14, 0.26, 0.34), L.saddle, [s * (bw - 0.02), by + 0.12, -bl + 0.48]) // saddle bag
-  }
-  piece(body, box(bw * 2 + 0.5, 0.1, 0.18), L.rack, [0, D.rackY, D.rackZ]) // the booster rack
-
-  // Neck + head (pivots at the withers): a thick neck leaning forward, the head angled nose-down.
-  const neck = []
-  const up = new Vector3(0, Math.cos(NECK_TILT), Math.sin(NECK_TILT)) // along the neck
-  const crest = new Vector3(0, Math.sin(NECK_TILT), -Math.cos(NECK_TILT)) // toward the mane
-  const base = new Vector3(...NECK_PIVOT)
-  const along = (d, back = 0) => base.clone().addScaledVector(up, d).addScaledVector(crest, back)
-  piece(neck, new CapsuleGeometry(D.neckRadius, D.neckLength, 4, 12), L.coat, along(D.neckLength / 2 + 0.06).toArray(), [NECK_TILT, 0, 0], [1, 1, 1.12])
-  // Blocky mane along the crest.
-  for (let i = 0; i < 5; i++) piece(neck, box(0.13, 0.17, 0.15), L.mane, along(0.04 + (i / 4) * D.neckLength, D.neckRadius - 0.02).toArray(), [NECK_TILT, 0, 0])
-  // The head and everything on it: positions in the head's own frame (+Z along the face, nose-down
-  // by HEAD_TILT), from the centre of the head box, which hangs off the top of the neck.
-  const headTilt = new Euler(HEAD_TILT, 0, 0)
-  const centre = along(D.neckLength + 0.1).add(new Vector3(0, -0.02, 0.24).applyEuler(headTilt))
-  const onHead = (x, y, z) => new Vector3(x, y, z).applyEuler(headTilt).add(centre).toArray()
-  const tilted = [HEAD_TILT, 0, 0]
-  piece(neck, box(0.3, 0.34, 0.6), L.coat, onHead(0, 0, 0), tilted)
-  piece(neck, box(0.26, 0.28, 0.2), L.muzzle, onHead(0, -0.03, 0.34), tilted)
-  piece(neck, box(0.28, 0.3, 0.035), L.leather, onHead(0, -0.03, 0.22), tilted) // noseband
-  piece(neck, box(0.16, 0.08, 0.14), L.mane, onHead(0, 0.19, -0.2), tilted) // forelock
-  if (L.blaze) piece(neck, box(0.08, 0.01, 0.5), L.blaze, onHead(0, 0.172, 0.06), tilted)
-  for (const s of [1, -1]) {
-    piece(neck, ball(0.028, 6, 4), '#1a1110', onHead(s * 0.08, -0.02, 0.44)) // nostril
-    piece(neck, ball(0.055, 10, 8), '#14100e', onHead(s * 0.15, 0.07, -0.02)) // eye
-    piece(neck, ball(0.019, 6, 4), '#ffffff', onHead(s * 0.19, 0.09, 0.01)) // eye shine
-    piece(neck, new ConeGeometry(0.06, 0.18, 6), L.coat, onHead(s * 0.09, 0.22, -0.24), [-0.35, 0, s * -0.2]) // ear
-    piece(neck, box(0.02, 0.025, 0.42), L.leather, onHead(s * 0.155, -0.05, 0.06), tilted) // cheek strap
-    // Reins: from the bit back to the pommel.
-    const from = new Vector3(...onHead(s * 0.14, -0.1, 0.3))
-    const to = new Vector3(s * 0.1, by + D.barrelHeight / 2 + 0.16, D.saddleZ + 0.34)
-    const mid = from.clone().add(to).multiplyScalar(0.5)
-    const len = from.distanceTo(to)
-    const dir = to.clone().sub(from).normalize()
-    const rein = new CylinderGeometry(0.012, 0.012, len, 4)
-    rein.applyQuaternion(new Quaternion().setFromUnitVectors(new Vector3(0, 1, 0), dir))
-    piece(neck, rein, L.leather, [mid.x, mid.y, mid.z])
-  }
-
-  // Tail: blocky tufts hanging from the dock.
-  const tail = []
-  piece(tail, new CapsuleGeometry(0.06, 0.12, 3, 8), L.coat, [TAIL_PIVOT[0], TAIL_PIVOT[1] - 0.04, TAIL_PIVOT[2] - 0.04], [0.5, 0, 0])
-  for (let i = 0; i < 4; i++) {
-    const w = 0.16 + (i === 1 || i === 2 ? 0.04 : 0)
-    piece(tail, box(w, 0.2, 0.12), L.mane, [0, TAIL_PIVOT[1] - 0.12 - i * 0.16, TAIL_PIVOT[2] - 0.1 - i * 0.03], [0.25, 0, 0])
-  }
-
-  // Legs: an upper (forearm / gaskin) and a lower (cannon, fetlock, hoof) per leg.
-  const legs = LEGS.map(({ side, front }) => {
-    const x = side * LEG_X
-    const z = front ? D.frontZ : D.hindZ
-    const hip = D.hipY
-    const knee = D.kneeY
-    const upper = []
-    const r = front ? 0.13 : 0.16
-    piece(upper, new CylinderGeometry(r, r * 0.75, hip - knee + 0.1, 10), L.coat, [x, (hip + knee) / 2, z])
-    piece(upper, ball(r * 1.05, 10, 8), L.coat, [x, knee, z])
-    if (!front) piece(upper, ball(1, 12, 10), L.coat, [x, hip + 0.04, z + 0.04], [0, 0, 0], [0.19, 0.3, 0.26]) // thigh
-    const lower = []
-    const sock = L.socks ? L.sock : L.coat
-    piece(lower, new CylinderGeometry(0.09, 0.08, knee - 0.12, 8), sock, [x, (knee + 0.12) / 2 + 0.02, z])
-    piece(lower, ball(0.105, 8, 6), sock, [x, 0.17, z + 0.02]) // fetlock
-    piece(lower, new CylinderGeometry(0.1, 0.125, 0.13, 10), L.hoof, [x, 0.065, z + 0.02])
-    return { upper: merged(upper, [x, hip, z]), lower: merged(lower, [x, knee, z]), pivot: [x, hip, z], knee: [x, knee, z] }
-  })
-
-  return {
-    body: merged(body, BODY_PIVOT),
-    neck: merged(neck, NECK_PIVOT),
-    tail: merged(tail, TAIL_PIVOT),
-    legs,
-  }
-}
-
 // --- Gait --------------------------------------------------------------------------
 const TAU = Math.PI * 2
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v)
@@ -270,55 +97,71 @@ function stride(p, duty) {
   return 1 - 2 * ease(t)
 }
 
-// lite (remote players' horses, remotePlayers.js): no exhaust sparks, no shadows, and the engines'
-// static parts baked to one mesh per material (only the flames stay apart: they flicker), so a
-// horse with 8 engines costs a handful of draw calls instead of ~60.
-export function createHorse({ lite = false } = {}) {
-  const root = new Group() // follows the player; the body bobs and tilts inside it
+// lite (remote players' horses, the stall's display horses, the window's pictures): no exhaust
+// sparks, no shadows, and the engines' static parts baked to one mesh per material (only the flames
+// stay apart: they flicker), so a horse with 8 engines costs a handful of draw calls instead of
+// ~60. engines = false: no boosters at all (display horses).
+export function createHorse({ lite = false, engines: withEngines = true } = {}) {
+  const D = HORSE.dims
+  const root = new Group() // follows the player; `frame` inside it carries the look's size
+  const frame = new Group()
+  root.add(frame)
   const material = new MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0 })
-  const body = new Group()
+  const glowMaterial = neon('#ffffff', HORSE.glow, { vertexColors: true })
+  const body = new Group() // bobs and tilts
   body.position.set(...BODY_PIVOT)
-  root.add(body)
-  const mesh = (parent, [x, y, z], [ox, oy, oz]) => {
+  frame.add(body)
+  const part = (holder) => {
+    const m = new Mesh(new BufferGeometry(), material)
+    m.castShadow = m.receiveShadow = !lite
+    const glowing = new Mesh(new BufferGeometry(), glowMaterial)
+    glowing.visible = false
+    holder.add(m, glowing)
+    return { mesh: m, glow: glowing }
+  }
+  const pivot = (parent, [x, y, z], [ox, oy, oz]) => {
     const g = new Group()
     g.position.set(x - ox, y - oy, z - oz)
     parent.add(g)
-    const m = new Mesh(undefined, material)
-    m.castShadow = !lite
-    m.receiveShadow = !lite
-    g.add(m)
-    return { pivot: g, mesh: m }
+    return { pivot: g, ...part(g) }
   }
-  const bodyMesh = new Mesh(undefined, material)
-  bodyMesh.castShadow = bodyMesh.receiveShadow = !lite
-  body.add(bodyMesh)
-  const neck = mesh(body, NECK_PIVOT, BODY_PIVOT)
-  const tail = mesh(body, TAIL_PIVOT, BODY_PIVOT)
+  const torso = part(body)
+  const neck = pivot(body, NECK_PIVOT, BODY_PIVOT)
+  const tail = pivot(body, TAIL_PIVOT, BODY_PIVOT)
   // Legs hang from the body (so they pitch with it); the lower segment from the upper's knee.
   const legs = LEGS.map((spec) => {
-    const x = spec.side * LEG_X
-    const z = spec.front ? D.frontZ : D.hindZ
-    const upper = mesh(body, [x, D.hipY, z], BODY_PIVOT)
-    const lower = mesh(upper.pivot, [x, D.kneeY, z], [x, D.hipY, z])
+    const upper = pivot(body, spec.hip, BODY_PIVOT)
+    const lower = pivot(upper.pivot, spec.knee, spec.hip)
     return { ...spec, upper, lower }
   })
 
-  function setLook(look = {}) {
-    const parts = buildParts(look)
-    bodyMesh.geometry?.dispose()
-    bodyMesh.geometry = parts.body
-    neck.mesh.geometry?.dispose()
-    neck.mesh.geometry = parts.neck
-    tail.mesh.geometry?.dispose()
-    tail.mesh.geometry = parts.tail
-    legs.forEach((leg, i) => {
-      leg.upper.mesh.geometry?.dispose()
-      leg.upper.mesh.geometry = parts.legs[i].upper
-      leg.lower.mesh.geometry?.dispose()
-      leg.lower.mesh.geometry = parts.legs[i].lower
-    })
+  const swap = (m, geo) => {
+    m.geometry?.dispose()
+    m.geometry = geo ?? new BufferGeometry()
+    m.visible = !!geo
   }
-  setLook()
+  // look: a catalog horse's look (horseModels.js horseLook) or {} for the default.
+  let size = 1
+  function setLook(look = {}) {
+    const parts = buildHorseParts(look)
+    swap(torso.mesh, parts.body)
+    swap(neck.mesh, parts.neck)
+    swap(tail.mesh, parts.tail)
+    swap(torso.glow, parts.glow.body)
+    swap(neck.glow, parts.glow.neck)
+    swap(tail.glow, parts.glow.tail)
+    legs.forEach((leg, i) => {
+      swap(leg.upper.mesh, parts.legs[i].upper)
+      swap(leg.lower.mesh, parts.legs[i].lower)
+    })
+    material.metalness = look.shine ?? 0
+    material.roughness = look.shine ? 0.35 : 0.7
+    // A bigger or smaller horse; the rider and partner keep their own size.
+    size = look.size ?? 1
+    frame.scale.setScalar(size)
+    rider.scale.setScalar(1 / size)
+    seat.scale.setScalar(1 / size)
+  }
 
   // The boosters sit on the rack behind the saddle: up to two high per side, further pairs behind,
   // an odd one under the belly. They take the equipped engine's colours and the mount's engine
@@ -402,7 +245,7 @@ export function createHorse({ lite = false } = {}) {
     layoutEngines() // (lite: bakes, leaving a flame marker per engine)
     flames = engines.map((e) => e.flame)
   }
-  setEngines(null, 2)
+  if (withEngines) setEngines(null, 2)
 
   // The avatar sits in the saddle; the equipped partner (companions.js) stands on the rump behind it.
   const rider = new Group()
@@ -411,6 +254,7 @@ export function createHorse({ lite = false } = {}) {
   const seat = new Group()
   seat.position.set(0, D.barrelY + D.barrelHeight / 2 + 0.02 - BODY_PIVOT[1], -D.barrelLength / 2 + 0.3)
   body.add(seat)
+  setLook()
 
   const G = HORSE.gait
   const weights = [1, 0, 0]
@@ -425,6 +269,18 @@ export function createHorse({ lite = false } = {}) {
     seat,
     setLook,
     setEngines,
+    // Frees this horse's geometry, materials and engines (a display horse or picture done with).
+    dispose() {
+      for (const e of engines) disposeGroup(e.group)
+      if (baked) disposeGroup(baked)
+      for (const m of jets ?? []) {
+        m.material.dispose()
+        m.dispose()
+      }
+      root.traverse((o) => o.isMesh && o.geometry.dispose())
+      material.dispose()
+      glowMaterial.dispose()
+    },
     // speed m/s, turn -1..1 (steering input), elapsed s, boost 0..~0.3 (race tap boost: longer,
     // fatter flames, a higher tail), grounded / vy (m/s) pose a jump.
     update(dt, speed, turn, elapsed, boost = 0, grounded = true, vy = 0) {
@@ -442,7 +298,7 @@ export function createHorse({ lite = false } = {}) {
       weights[2] = a * b
       let strideLength = 0
       for (let g = 0; g < 3; g++) strideLength += weights[g] * G[GAITS[g]].stride
-      phase = (phase + clamp(speed / strideLength, G.minRate, G.maxRate) * moving * dt) % 1
+      phase = (phase + clamp(speed / (strideLength * size), G.minRate, G.maxRate) * moving * dt) % 1
       air += ((grounded ? 0 : 1) - air) * (1 - Math.exp(-12 * dt))
 
       for (const leg of legs) {

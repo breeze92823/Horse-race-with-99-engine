@@ -25,7 +25,7 @@ function onPress(e) {
   if (b.classList.contains('touch-btn')) {
     if (!racing) sfx.click(pan) // mid-race JUMP is a boost tap, which has its own sound
   } else if (b.classList.contains('uiw-btn') || b.classList.contains('race-leave')) sfx.press(pan)
-  else if (b.getAttribute('role') === 'option' || b.closest('[role="listbox"], .pt-grid, .gf-grid, .bt-grid')) sfx.tick(pan)
+  else if (b.getAttribute('role') === 'option' || b.closest('[role="listbox"], .pt-grid, .gf-grid, .hs-grid')) sfx.tick(pan)
   else if (b.classList.contains('hud-auto')) sfx.toggle(!b.classList.contains('on'))
   else if (b.classList.contains('hud-slot')) sfx.holster()
   else sfx.click(pan)

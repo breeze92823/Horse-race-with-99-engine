@@ -17,15 +17,13 @@ import {
   TubeGeometry,
   Vector3,
 } from 'three'
-import { BOATS } from './config.js'
 import { makeEngine } from './horse.js'
 import { put, std } from './propkit.js'
 
-// Every boat in the Boats catalog (BOATS.list in config.js), also used by the
-// Boats stall (shops.js). Each builder returns a Group with the bow toward +Z
-// and the deck/rim at y = 0 (the hull hangs below), roughly 8-9 m long; boat.js
-// scales an equipped one to the player's boat length. `userData.deck` is the
-// height the rider stands at, in the model's own units.
+// Procedural boats, left over from the boat game: now only the race's anchored
+// ships (raceScenery.js, RACE.scenery.ships). Each builder returns a Group with
+// the bow toward +Z and the deck/rim at y = 0 (the hull hangs below), roughly
+// 8-9 m long. `userData.deck` is the deck height, in the model's own units.
 
 const pinch = (z) => 1 - 0.45 * z * z
 
@@ -395,12 +393,9 @@ const BUILDERS = {
   galleon: makeGalleon,
 }
 
-export const boatById = (id) => BOATS.list.find((b) => b.id === id)
-
-// A fresh model of catalog boat `id` (or of a { kind, ...colours } spec).
+// A fresh model of a { kind, model: colours } spec.
 export function buildBoat(spec) {
-  const b = typeof spec === 'string' ? boatById(spec) : spec
-  const group = BUILDERS[b.kind](b.model ?? {})
+  const group = BUILDERS[spec.kind](spec.model ?? {})
   group.userData.deck ??= 0
   return group
 }

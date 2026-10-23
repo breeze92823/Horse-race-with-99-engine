@@ -7,8 +7,8 @@ import { anyWindowOpen } from './uiWindow.js'
 import { sfx } from './audio/index.js'
 
 // Hub pads: a glowing touch pad in front of each shop object (HUB.pads). The
-// boat driving onto one opens that object's window: the Eggs stall opens Pets,
-// the Boats stall Boats, the Engine Upgrade machine Engine, the hero statues
+// horse riding onto one opens that object's window: the Eggs stall opens Pets,
+// the Horses stall Horses, the Engine Upgrade machine Engine, the hero statues
 // Partner. A pad fires once per visit (drive off to re-arm), and never while
 // another window is open (it just counts as visited then), so closing a window
 // on the pad does not pop it straight back up.

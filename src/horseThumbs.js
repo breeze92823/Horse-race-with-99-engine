@@ -1,14 +1,15 @@
 import { Box3, DirectionalLight, HemisphereLight, PerspectiveCamera, Scene, SRGBColorSpace, Vector3, WebGLRenderer } from 'three'
-import { BOATS } from './config.js'
-import { buildBoat, disposeBoat } from './boatModels.js'
+import { HORSES } from './config.js'
+import { createHorse } from './horse.js'
+import { horseLook } from './horseModels.js'
 
-// Tile pictures for the Boats window: each catalog boat rendered once, three-
-// quarter view with the bow to the right, on a transparent background with a
-// thick dark outline (like the reference's cut-out renders). One boat per
-// animation frame on a small throwaway WebGL context, so the game never
-// stalls; the context is released when the queue is empty. Results are blob
-// URLs, cached by boat id.
-const { width: W, height: H, outline: R } = BOATS.thumb
+// Tile pictures for the Horses window: each catalog horse rendered once,
+// three-quarter view with the nose to the right, standing, without rider or
+// boosters, on a transparent background with a thick dark outline (like the
+// reference's cut-out renders). A few horses per frame on a small throwaway
+// WebGL context, so the game never stalls; the context is released when the
+// queue is empty. Results are blob URLs, cached by horse id.
+const { width: W, height: H, outline: R } = HORSES.thumb
 const urls = new Map() // id -> blob URL
 const waiting = new Map() // id -> [callbacks]
 const queue = []
@@ -43,22 +44,25 @@ function teardown() {
 
 const box = new Box3()
 const size = new Vector3()
-const view = new Vector3(-1, 0.62, 0.72).normalize() // camera direction from the boat: bow (+Z) points right
+const view = new Vector3(-1, 0.42, 0.62).normalize() // camera direction from the horse: nose (+Z) points right
 function render(id) {
-  const boat = buildBoat(id)
-  scene.add(boat)
-  box.setFromObject(boat)
+  const horse = createHorse({ lite: true, engines: false })
+  horse.setLook(horseLook(id))
+  horse.update(1 / 60, 0, 0, 0) // the standing pose
+  horse.root.updateMatrixWorld(true)
+  scene.add(horse.root)
+  box.setFromObject(horse.root)
   box.getSize(size)
-  // Framed on the hull's footprint (masts and prows may run off the top, as in the reference).
-  const span = Math.max(size.z, size.x * 1.6)
+  // Framed to fit the whole horse (wings and horns included), standing on the tile's lower edge.
+  const span = Math.max(size.z, size.x, size.y * 1.05)
   const tanHalfWidth = Math.tan((camera.fov * Math.PI) / 360) * camera.aspect
-  const dist = (span * 0.5) / tanHalfWidth / 0.86
-  const target = new Vector3((box.min.x + box.max.x) / 2, box.min.y + Math.min(size.y, span * 0.3) * 0.55, (box.min.z + box.max.z) / 2)
+  const dist = (span * 0.5) / tanHalfWidth / 0.9
+  const target = new Vector3((box.min.x + box.max.x) / 2, box.min.y + size.y * 0.5, (box.min.z + box.max.z) / 2)
   camera.position.copy(target).addScaledVector(view, dist)
   camera.lookAt(target)
   gl.render(scene, camera)
-  scene.remove(boat)
-  disposeBoat(boat)
+  scene.remove(horse.root)
+  horse.dispose()
 
   // Outline: the silhouette stamped around a circle in ink, then the picture on top.
   const ctx = out.getContext('2d')
@@ -81,7 +85,7 @@ function finish(id, url) {
   waiting.delete(id)
 }
 
-// Draws queued boats a few milliseconds per frame; the PNG encodes finish on their own.
+// Draws queued horses a few milliseconds per frame; the PNG encodes finish on their own.
 async function pump() {
   running = true
   const pending = []
@@ -91,7 +95,7 @@ async function pump() {
       setTimeout(r, 120) // rAF is paused in background tabs
     })
     const start = performance.now()
-    while (queue.length && performance.now() - start < BOATS.thumb.budgetMs) {
+    while (queue.length && performance.now() - start < HORSES.thumb.budgetMs) {
       const id = queue.shift()
       if (urls.has(id) || pending.includes(id)) continue
       if (!gl) setup()
@@ -100,7 +104,7 @@ async function pump() {
       try {
         job = render(id)
       } catch (err) {
-        console.warn('[boats] thumbnail failed', id, err)
+        console.warn('[horses] thumbnail failed', id, err)
         job = Promise.resolve('')
       }
       job.then((url) => {
@@ -113,9 +117,9 @@ async function pump() {
   running = false
 }
 
-// Calls fn(url) once boat `id`'s picture is ready ('' if it could not be drawn).
+// Calls fn(url) once horse `id`'s picture is ready ('' if it could not be drawn).
 // `first` puts it at the front of the queue.
-export function boatThumb(id, fn, first = false) {
+export function horseThumb(id, fn, first = false) {
   if (urls.has(id)) return fn(urls.get(id))
   if (!waiting.has(id)) waiting.set(id, [])
   waiting.get(id).push(fn)

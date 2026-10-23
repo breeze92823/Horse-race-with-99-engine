@@ -152,8 +152,8 @@ function lighthouse(seed) {
 
 // An anchored ship (a catalog boat scaled up), rocking at anchor.
 const box = new Box3()
-function ship([id, length], seed) {
-  const model = buildBoat(id)
+function ship([spec, length], seed) {
+  const model = buildBoat(spec)
   box.setFromObject(model)
   const k = length / Math.max(0.01, box.max.z - box.min.z)
   model.scale.setScalar(k)

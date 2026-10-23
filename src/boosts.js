@@ -1,15 +1,15 @@
-import { BOATS, PARTNER, RACE } from './config.js'
+import { HORSES, PARTNER, RACE } from './config.js'
 import { ENGINES, engineBoost, engineState } from './engine.js'
 import { partnerBoost, partnerState } from './partner.js'
 import { petBoost, petsState } from './pets.js'
-import { boatState } from './boats.js'
+import { horseState } from './horses.js'
 import { rebirthBoost, rebirthState } from './rebirth.js'
 import { trailById, trailState } from './trails.js'
 
 // Everything the player owns that has a value, wired into gameplay. Each
 // equipped thing is a source of % stats (as its window shows them):
-//   engine   wins / acc / train, times the boat's engine count ("x5" carries 5)
-//   boat     wins / luck / acc
+//   engine   wins / acc / train, times the horse's booster count ("x5" carries 5)
+//   horse    wins / luck / acc
 //   partner  wins / luck / acc
 //   trail    wins / acc
 //   rebirth  +REBIRTH.boostPerRebirth % per rebirth, to wins and train
@@ -21,14 +21,14 @@ import { trailById, trailState } from './trails.js'
 //   luck   sum of luck %; `lucky` = luck / (luck + RACE.luck.half) (at most RACE.luck.max)
 //          is each checkpoint's chance to pay double
 // Read when a race starts / a training tick pays, so equipping something counts from the next one.
-const boatById = new Map(BOATS.list.map((b) => [b.id, b]))
+const horseById = new Map(HORSES.list.map((h) => [h.id, h]))
 const engineById = new Map(ENGINES.map((e) => [e.id, e]))
 const partnerById = new Map(PARTNER.partners.map((p) => [p.id, p]))
 
 // [{ id, name, wins, acc, luck, train }] in %, one per source (zeros where it has none).
 export function boostSources() {
-  const boat = boatById.get(boatState.equipped)
-  const count = boat?.engines ?? 1
+  const horse = horseById.get(horseState.equipped)
+  const count = horse?.engines ?? 1
   const engine = engineBoost()
   const partner = partnerBoost()
   const trail = trailById(trailState.equipped)
@@ -40,7 +40,7 @@ export function boostSources() {
       acc: engine.acc * count,
       train: engine.train * count,
     }),
-    row('boat', boat?.name ?? 'No Boat', boat),
+    row('horse', horse?.name ?? 'No Horse', horse),
     row('partner', partnerById.get(partnerState.equipped)?.name ?? 'No Partner', partner),
     row('trail', trail ? `${trail.name} Trail` : 'No Trail', trail?.stats),
     row('rebirth', `Rebirth x${rebirthState.rebirths}`, { wins: rebirth, train: rebirth }),

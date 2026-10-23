@@ -88,7 +88,7 @@ export function flash(kind = 'gold') {
 
 // Grid cards cascade in (window just opened): the first JUICE.cascade cards rise into place in turn.
 export function cardsIn(root) {
-  const cards = root.querySelectorAll('.pt-pet, .bt-tile, .gf-card, [role="option"]')
+  const cards = root.querySelectorAll('.pt-pet, .hs-tile, .gf-card, [role="option"]')
   const n = Math.min(cards.length, JUICE.cascade)
   // One forced layout for the whole batch (not one per card) to restart the animation.
   for (let i = 0; i < n; i++) cards[i].classList.remove('juice-in')

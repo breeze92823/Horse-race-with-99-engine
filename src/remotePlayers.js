@@ -1,6 +1,6 @@
 // The other players in the room, drawn in the world (after Clean-leaves-for-loot's remotePlayers.js):
-// each is their Bloxity avatar riding their horse (dressed as their equipped mount, boosters in the
-// equipped engine's colours x the mount's engine count), their trail behind it, their pets hovering
+// each is their Bloxity avatar riding their equipped horse (boosters in the equipped engine's
+// colours x the horse's booster count), their trail behind it, their pets hovering
 // round it, their partner on its rump and a name tag, eased toward the pose the server last relayed (net.js
 // roster), plus speed x heading for the time since (dead reckoning), so fast racers glide instead
 // of stepping. Poses are in TRACK coordinates (z minus the sender's race scroll): drawn at
@@ -9,9 +9,10 @@
 // gear changes need no events. Nearest first, capped (fewer on touch); pets, partner and trail only
 // up close; a remote horse is `lite` (horse.js): engines baked, no shadows (draw calls).
 import { Group } from 'three'
-import { BOATS, COARSE_POINTER, NET } from './config.js'
+import { COARSE_POINTER, HORSES, NET } from './config.js'
 import { roster, net, sameWorld } from './net.js'
-import { boatLook, createHorse } from './horse.js'
+import { createHorse } from './horse.js'
+import { horseLook } from './horseModels.js'
 import { ENGINES } from './engine.js'
 import { trailById } from './trails.js'
 import { createTrail } from './trail.js'
@@ -23,7 +24,7 @@ import { disposeAnimator, makeAnimator } from './avatar/animator.js'
 
 const angleDelta = (from, to) => Math.atan2(Math.sin(to - from), Math.cos(to - from))
 const engineById = new Map(ENGINES.map((e) => [e.id, e]))
-const boatById = new Map(BOATS.list.map((b) => [b.id, b]))
+const horseById = new Map(HORSES.list.map((h) => [h.id, h]))
 const MAX = COARSE_POINTER ? NET.maxRemotesTouch : NET.maxRemotes
 
 // "dog:0,cat:2" -> [{ kind, tier }]
@@ -97,12 +98,12 @@ class Remote {
     const a = this.applied
     if (p.boat !== a.boat) {
       a.boat = p.boat
-      this.horse.setLook(boatLook(boatById.get(boatById.has(p.boat) ? p.boat : BOATS.start.equipped))) // none sent yet: the starter
+      this.horse.setLook(horseLook(horseById.has(p.boat) ? p.boat : HORSES.start.equipped)) // none sent yet: the starter
       a.engine = undefined // the engine count comes with the boat
     }
     if (p.engine !== a.engine) {
       a.engine = p.engine
-      const count = boatById.get(boatById.has(p.boat) ? p.boat : BOATS.start.equipped)?.engines ?? 1
+      const count = horseById.get(horseById.has(p.boat) ? p.boat : HORSES.start.equipped)?.engines ?? 1
       this.horse.setEngines(engineById.get(p.engine)?.look ?? null, count)
     }
     if (p.trail !== a.trail) {
