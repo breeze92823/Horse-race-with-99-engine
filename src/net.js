@@ -1,4 +1,4 @@
-// Colyseus link to Boat-race-with-99-engine-backend (room "world"), after Kayak & Surf's net.js.
+// Colyseus link to Horse-race-backend (room "world"), after Kayak & Surf's net.js.
 // The server holds the player's ONLY save: nothing about progress is kept in the browser. On join
 // the server answers with `progress` (the saved doc: every store's hydrate() takes its part),
 // `noProgress` (new account, guest or no database: keep the fresh state and save it) or
@@ -52,8 +52,8 @@ function storedId(key, make) {
   }
 }
 const rand = () => Math.random().toString(36).slice(2, 8)
-const GUEST = storedId('boat-race-99.guest', () => `guest-${rand()}`)
-const DEV = DEV_MODE ? storedId('boat-race-99.dev', () => `dev-${rand()}`) : ''
+const GUEST = storedId('horse-race-99.guest', () => `guest-${rand()}`)
+const DEV = DEV_MODE ? storedId('horse-race-99.dev', () => `dev-${rand()}`) : ''
 
 function identity() {
   if (DEV) return { userId: DEV, username: `Dev ${DEV.slice(4)}` }

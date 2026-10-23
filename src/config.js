@@ -1,8 +1,8 @@
 // Every tunable constant lives here; the rest of src/ holds no theme values.
 
 // --- Identity -------------------------------------------------------------
-export const GAME_SLUG = 'boat-race-with-99-engine' // slug registered on bloxity.io
-export const GAME_TITLE = 'Boat Race with 99 Engine'
+export const GAME_SLUG = 'horse-race-with-99-engine' // slug registered on bloxity.io
+export const GAME_TITLE = 'Horse Race with 99 Engine'
 
 // Forces the Bloxity SDK and avatar CDN to be treated as unavailable (see .env.example).
 export const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true'
@@ -10,7 +10,7 @@ export const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true'
 export const DEV_WORLDS = import.meta.env.DEV && import.meta.env.VITE_DEV_WORLDS === 'true'
 
 // --- Server (net.js) -----------------------------------------------------------
-// The Colyseus server (../Boat-race-with-99-engine-backend) holds the only save: nothing is kept
+// The Colyseus server (../Horse-race-backend) holds the only save: nothing is kept
 // in the browser. Deployed builds (prod and the dev channel) always go through the Bloxity
 // matchmaker (Legion.SDK.net.resolveEndpoint): a fixed socket URL would pin everyone to one pod.
 // Only the local dev server (`npm run dev`) connects straight to a URL.
@@ -1087,7 +1087,7 @@ export const TRAILS = {
 // level (the portal's sound_volume setting overrides it; M mutes, saved under storageKey).
 export const AUDIO = {
   volume: 0.8,
-  storageKey: 'boat-race-99.sound',
+  storageKey: 'horse-race-99.sound',
   buses: { ui: 0.8, sfx: 0.9, amb: 0.55, engine: 0.5 }, // per-bus levels before the master
   duck: 0.45, // world (ambience + engine) level while a menu window is open
   maxVoices: 48, // one-shot sounds at once before low-priority ones are skipped
