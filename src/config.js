@@ -2,7 +2,7 @@
 
 // --- Identity -------------------------------------------------------------
 export const GAME_SLUG = 'horse-race-with-99-engine' // slug registered on bloxity.io
-export const GAME_TITLE = 'Horse Race with 99 Engine'
+export const GAME_TITLE = 'Horse Race'
 
 // Forces the Bloxity SDK and avatar CDN to be treated as unavailable (see .env.example).
 export const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true'

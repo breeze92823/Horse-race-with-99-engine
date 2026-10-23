@@ -1,4 +1,4 @@
-# Horse Race with 99 Engine
+# Horse Race
 
 Status: converted from its copy-source, Boat Race with 99 Engine (`C:\ThreeJS\Boat-race-with-99-engine`), into a horse race: the player rides a procedural horse with rocket boosters on the saddle, races on a dirt track through farm country, and the lobby is a ranch (the second world a Western frontier town). What still carries the boat game's names on purpose: the world id `beach` (saved), and references to the user's reference shots ("the Boats reference"). Git: work on `horse-race`; the boat repos are the `boat-origin` remote with pushing disabled, and nothing is pushed until the new remotes exist.
 
