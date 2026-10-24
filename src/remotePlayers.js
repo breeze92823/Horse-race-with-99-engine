@@ -6,9 +6,12 @@
 // z + this player's own scroll, racers line up in the lane and lobby players slide away with the
 // start island while this player races. Diffed against the roster every frame, so joins / leaves /
 // gear changes need no events. Nearest first, capped (fewer on touch); pets, partner and trail only
-// up close; a remote horse is `lite` (horse.js): no hoof dust, no shadows (draw calls).
+// up close; a remote horse is `lite` (horse.js): no hoof dust, no shadows (draw calls). Their Boxity
+// emotes play on their rider (roster `emote`) and their chat shows in a bubble over the name tag.
 import { Group } from 'three'
-import { COARSE_POINTER, HORSES, NET } from './config.js'
+import { CHAT_BUBBLE, COARSE_POINTER, EMOTE, HORSES, NET } from './config.js'
+import { emoteClip } from './bloxity.js'
+import { createBubble } from './chatBubble.js'
 import { roster, net, sameWorld } from './net.js'
 import { createHorse } from './horse.js'
 import { horseLook } from './horseModels.js'
@@ -49,6 +52,8 @@ class Remote {
     this.generation = 0
     this.applied = {} // horse / engine / trail / pets / partner / name as last applied
     this.label = null
+    this.bubble = createBubble(this.group, CHAT_BUBBLE.remoteY)
+    this.p = null // the roster entry last drawn (chat bubbles find their player by it)
     this.placed = false
     this.detail = true
     this.base = { x: 0, y: 0, z: 0, yaw: 0, speed: 0, at: 0, key: '' }
@@ -64,6 +69,7 @@ class Remote {
     next.traverse((o) => o.isMesh && (o.castShadow = false)) // shadow passes add up in a full room
     this.horse.rider.add(next)
     this.animator = makeAnimator(next)
+    this.applied.emote = undefined // the new rig picks up an emote still playing
   }
 
   // A signed-in player's look arrives as JSON { equipped, proportions, skin }; "" = default.
@@ -132,8 +138,17 @@ class Remote {
   }
 
   update(p, dt, t, now, scroll, scrollSpeed, camera, near) {
+    this.p = p
     this.syncGear(p)
     this.syncAvatar(p.avatar)
+    const emote = p.emote || ''
+    if (emote !== this.applied.emote) {
+      this.applied.emote = emote
+      const clip = emoteClip(emote.split(':')[0])
+      if (clip) this.animator?.playEmote(clip)
+      else this.animator?.stopEmote()
+    }
+    this.bubble.update(now)
     this.setDetail(near)
     const trail = near ? p.trail : ''
     if (trail !== this.applied.trailShown) {
@@ -159,6 +174,7 @@ class Remote {
     this.lastY = g.position.y
     this.placed = true
 
+    if (b.speed > EMOTE.stopSpeed) this.animator?.stopEmote() // moving ends it, as on the sender's side
     const grounded = Math.abs(this.vy) < 0.5
     this.horse.update(dt, b.speed, 0, t, 0, grounded, this.vy)
     this.animator?.update(dt, { grounded, speed: b.speed, verticalVelocity: this.vy, turn: 0, riding: true, mount: this.horse.motion })
@@ -180,6 +196,7 @@ class Remote {
   dispose() {
     this.generation++ // an avatar still loading is dropped
     this.scene.remove(this.group)
+    this.bubble.dispose()
     disposeAnimator(this.animator)
     this.trail.dispose()
     this.companions.dispose() // takes the partner (shared, cached geometry) off the seat first
@@ -204,6 +221,17 @@ export function createRemotePlayers(scene) {
   return {
     get count() {
       return remotes.size
+    },
+    // A Boxity chat message from another player: a bubble over them if they are drawn. Found by their
+    // Bloxity id (roster userId), else by name (guests have no id on the roster).
+    say(userId, username, text, seconds) {
+      let found = null
+      for (const r of remotes.values()) {
+        if (!r.p) continue
+        if (userId && r.p.userId === userId) found = r
+        else if (!found && username && r.p.username === username) found = r
+      }
+      found?.bubble.show(text, seconds)
     },
     // Dev: what each drawn remote costs (meshes = draw calls; shadow casters draw again).
     stats() {

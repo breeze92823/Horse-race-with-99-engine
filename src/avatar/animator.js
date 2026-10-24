@@ -5,10 +5,11 @@
 // stay planted at any speed. Writes only to bones and the avatar root's
 // rotation / position.y (the player group owns world placement). In the saddle (`ride`) the rider
 // follows the horse: springs on the saddle's own acceleration plus the horse's gait, push-off,
-// halt, jump and turns (horse.js `motion`, passed as input.mount).
-import { Quaternion, Vector3 } from 'three'
-import { ANIM } from '../config.js'
-import { PlayerRig, PoseBuffer } from './rig.js'
+// halt, jump and turns (horse.js `motion`, passed as input.mount). Boxity emotes (playEmote) play
+// on top of whatever pose the state wrote.
+import { Euler, Quaternion, Vector3 } from 'three'
+import { ANIM, EMOTE } from '../config.js'
+import { BONE_INDEX, PlayerRig, PoseBuffer } from './rig.js'
 
 const TAU = Math.PI * 2
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v)
@@ -26,6 +27,20 @@ const tmpP = new Vector3()
 const tmpV = new Vector3()
 const tmpA = new Vector3()
 const tmpQ = new Quaternion()
+const tmpE = new Euler()
+const DEG = Math.PI / 180
+const LEG = /^Leg[LR]\d/
+
+// An emote track at time t: [[s, xDeg, yDeg, zDeg], ...] eased (smoothstep) between keys, held
+// outside them. Writes radians into tmpE.
+function sampleTrack(keys, t) {
+  let i = 0
+  while (i < keys.length - 2 && t >= keys[i + 1][0]) i++
+  const a = keys[i]
+  const b = keys[Math.min(i + 1, keys.length - 1)]
+  const s = b === a || b[0] <= a[0] ? (t >= b[0] ? 1 : 0) : ease(clamp((t - a[0]) / (b[0] - a[0]), 0, 1))
+  tmpE.set(lerp(a[1], b[1], s) * DEG, lerp(a[2], b[2], s) * DEG, lerp(a[3], b[3], s) * DEG, 'XYZ')
+}
 
 export function makeAnimator(root) {
   if (!root) return null
@@ -64,9 +79,29 @@ class PlayerAnimator {
     this.lookTo = 0
     this.fidget = null // { kind: 'pat', t, dur }
     this.nextFidget = 3
+    // Emotes: every named rig node's bind rotation (the animator is made in the bind pose; the clip
+    // may drive nodes the pose buffer doesn't, e.g. ArmR_Offset) and the one playing.
+    this.bind = {}
+    for (const [name, node] of Object.entries(root.nodes ?? {})) if (node?.quaternion) this.bind[name] = { node, rest: node.quaternion.clone(), posed: name in BONE_INDEX }
+    this.emote = null // { clip, t, w, stopping }
+  }
+
+  // A Boxity emote clip { len, loop, tracks } (bloxity.js emoteClip), played over the current pose.
+  playEmote(clip) {
+    if (clip?.tracks) this.emote = { clip, t: 0, w: this.emote?.w ?? 0, stopping: false }
+  }
+
+  stopEmote() {
+    if (this.emote) this.emote.stopping = true
+  }
+
+  // An emote is playing and not on its way out.
+  get emoting() {
+    return !!this.emote && !this.emote.stopping
   }
 
   dispose() {
+    for (const b of Object.values(this.bind)) b.node.quaternion.copy(b.rest)
     this.rig.resetToBindPose()
     this.root.rotation.set(0, 0, 0)
     this.root.position.y = 0
@@ -81,7 +116,35 @@ class PlayerAnimator {
     this.writePose(dt, input)
     this.blend(dt)
     this.rig.applyPose(this.output)
+    this.applyEmote(dt, input.riding)
     this.applyVisual(dt, input)
+  }
+
+  // Each track is degree deltas over its bone's bind rotation (euler XYZ, right-multiplied), slerped
+  // in over the pose by the emote's weight. Unknown bones are skipped; in the saddle the legs stay
+  // round the barrel instead of dancing through the horse.
+  applyEmote(dt, riding) {
+    const e = this.emote
+    if (!e) return
+    const { len, loop, tracks } = e.clip
+    e.t += dt
+    if (!loop && e.t >= len) e.stopping = true
+    e.w = clamp(e.w + (e.stopping ? -dt / EMOTE.blendOut : dt / EMOTE.blendIn), 0, 1)
+    const time = loop ? e.t % len : Math.min(e.t, len)
+    const w = ease(e.w)
+    for (const name in tracks) {
+      const b = this.bind[name]
+      const keys = tracks[name]
+      if (!b || !Array.isArray(keys) || !keys.length || (riding && LEG.test(name))) continue
+      if (!b.posed) b.node.quaternion.copy(b.rest) // nothing else writes it each frame
+      sampleTrack(keys, time)
+      tmpQ.setFromEuler(tmpE).premultiply(b.rest)
+      b.node.quaternion.slerp(tmpQ, w)
+    }
+    if (e.stopping && e.w <= 0) {
+      this.emote = null
+      for (const name in tracks) if (this.bind[name] && !this.bind[name].posed) this.bind[name].node.quaternion.copy(this.bind[name].rest)
+    }
   }
 
   resolveState(dt, input) {

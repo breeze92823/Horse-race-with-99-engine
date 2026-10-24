@@ -1,7 +1,8 @@
 import { ACESFilmicToneMapping, Clock, Group, PCFSoftShadowMap, PerspectiveCamera, Scene, SRGBColorSpace, WebGLRenderer } from 'three'
-import { CAMERA, DAILY, graphicsPreset, PHYSICS, RACE, RENDER, TRAILS } from './config.js'
+import { CAMERA, CHAT_BUBBLE, DAILY, EMOTE, graphicsPreset, PHYSICS, RACE, RENDER, TRAILS } from './config.js'
 import * as bloxity from './bloxity.js'
-import { initNet, net, onNetMessage, sendLoadout, sendPose, syncAvatar } from './net.js'
+import { initNet, net, onNetMessage, sendEmote, sendLoadout, sendPose, syncAvatar } from './net.js'
+import { createBubble } from './chatBubble.js'
 import { inputState, install as installInput, onKey } from './input.js'
 import { installTouch } from './touch.js'
 import { createHud } from './hud.js'
@@ -178,6 +179,16 @@ bloxity.onProportionsChanged(() => {
   syncAvatar()
 })
 bloxity.onRespawnRequest(() => respawnOrLeave())
+
+// Boxity emotes (picked in Boxity's own emote picker): the rider plays it and the others see it
+// (roster `emote`). Moving, racing or the Trails scene ends it; the end is relayed too.
+let emoteShown = false
+bloxity.onEmote((id, clip) => {
+  if (race.isRacing() || trailsScene?.isOpen() || !animator) return
+  animator.playEmote(clip)
+  sendEmote(id)
+  emoteShown = true
+})
 
 // --- Modes + keys --------------------------------------------------------------
 onModeChanged((mode) => {
@@ -370,6 +381,13 @@ syncGear()
 setInterval(syncGear, 250)
 // Everyone else in the room, with their horses, trails, pets and partners (remotePlayers.js).
 const remotes = createRemotePlayers(scene)
+// Boxity chat: each player's latest message in a bubble over their head (Boxity draws the chat itself).
+const bubble = createBubble(playerGroup, CHAT_BUBBLE.y)
+bloxity.onChatMessage((m) => {
+  const seconds = bloxity.chatBubbleSeconds()
+  if (m.local) bubble.show(m.text, seconds)
+  else remotes.say(m.userId, m.username, m.text, seconds)
+})
 const round = (n) => Math.round(n * 100) / 100
 
 // Progress lives only on the server (net.js): it loads each window's part of the save into it
@@ -419,6 +437,13 @@ renderer.setAnimationLoop(() => {
     animator?.update(dt, { grounded: player.grounded, speed, verticalVelocity: player.velocity.y, turn: 0, riding: true, mount: horse.motion })
   }
 
+  if (animator?.emoting && (racing || staging || speed > EMOTE.stopSpeed)) animator.stopEmote()
+  if (emoteShown && !animator?.emoting) {
+    emoteShown = false
+    sendEmote('')
+  }
+  bubble.update()
+
   if (racing) race.camera(camera, dt)
   else if (!staging) updateCamera(camera, dt)
   // Hooves and the countryside ambience follow the horse and the camera.
@@ -447,7 +472,7 @@ renderer.setAnimationLoop(() => {
   // This player for the others, in track coordinates (the real position, not the Trails showcase).
   const track = race.trackScroll()
   sendPose({ x: round(player.position.x), y: round(player.position.y), z: round(player.position.z - track), yaw: round(player.facing), speed: round(racing ? race.horseSpeed() : speed) })
-  remotes.update(dt, elapsed, player.renderPosition, track, scroll, camera)
+  if (avatarReady) remotes.update(dt, elapsed, player.renderPosition, track, scroll, camera) // other players appear once this player's own Bloxity character has loaded
   hud.update()
   updateParticles(elapsed, renderer.domElement.height)
   lobby.update(dt, elapsed)
