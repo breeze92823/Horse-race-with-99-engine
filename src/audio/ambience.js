@@ -28,8 +28,14 @@ const s = {
   racing: false,
 }
 
-const filt = (type, f, q = 0.7) => {
+// A filter fed by a stereo bed is pinned to 2 channels: a buffer source is mono until it starts,
+// and the filter changing channel count mid-stream makes Chrome warn of audio glitches.
+const filt = (type, f, q = 0.7, stereo = false) => {
   const b = A.ctx.createBiquadFilter()
+  if (stereo) {
+    b.channelCount = 2
+    b.channelCountMode = 'explicit'
+  }
   b.type = type
   b.frequency.value = f
   b.Q.value = q
@@ -53,19 +59,19 @@ onStart((ctx) => {
   // Wind: stereo pink -> band (opens in a gust) -> gust envelope -> level.
   s.windLevel = gain(0)
   s.windLevel.connect(bus)
-  s.windFilter = filt('bandpass', 420, 0.45)
+  s.windFilter = filt('bandpass', 420, 0.45, true)
   s.wind = gain(0.4)
   loop(A.noise.pinkStereo).connect(s.windFilter).connect(s.wind).connect(s.windLevel)
   // Grass rustle: a high, grainy hiss that only comes up in the gusts.
   s.rustle = gain(0)
-  loop(A.noise.pinkStereo).connect(filt('highpass', 3200, 0.5)).connect(s.rustle).connect(s.windLevel)
+  loop(A.noise.pinkStereo).connect(filt('highpass', 3200, 0.5, true)).connect(s.rustle).connect(s.windLevel)
   // Crowd: a murmur of many voices (two formant-ish bands of pink noise), swelling into cheers.
   s.crowdLevel = gain(0)
   s.crowdLevel.connect(bus)
   s.crowd = gain(0.5)
   s.crowd.connect(s.crowdLevel)
-  loop(A.noise.pinkStereo).connect(filt('bandpass', 650, 0.9)).connect(gain(1)).connect(s.crowd)
-  loop(A.noise.pinkStereo).connect(filt('bandpass', 1700, 1.4)).connect(gain(0.5)).connect(s.crowd)
+  loop(A.noise.pinkStereo).connect(filt('bandpass', 650, 0.9, true)).connect(gain(1)).connect(s.crowd)
+  loop(A.noise.pinkStereo).connect(filt('bandpass', 1700, 1.4, true)).connect(gain(0.5)).connect(s.crowd)
   // Night crickets: each is a sine whose gain is pulsed into chirps by the scheduler.
   for (const [f, pan] of M.crickets) {
     const o = ctx.createOscillator()
