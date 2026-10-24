@@ -20,6 +20,8 @@ import {
   getSkinTextureUrl,
   launchRoomId,
   locateRoom,
+  playerInRoom,
+  playerJoined,
   resolveServerEndpoint,
   subscribeAuth,
   updateRoom,
@@ -205,14 +207,35 @@ export function syncAvatar() {
   sentAvatar = avatar
   send('setAvatar', { avatar })
 }
+// A Boxity emote this player started (its catalog id), or '' once it ended: the others play it too.
+export function sendEmote(id) {
+  if (net.connected) send('emote', { id: id || '' })
+}
 // Everyone in the room (sessionId -> roster entry), null when offline.
 export const roster = () => (net.connected ? net.room?.state?.players ?? null : null)
+
+// Boxity's friend-join toasts: whoever is already in the room when this player's own roster entry
+// arrives is "in room", anyone after that "joined". Checked once a second; reset per room.
+let announced = null // sessionIds already announced in the current room
+function announcePlayers() {
+  const players = roster()
+  if (!players?.get?.(net.sessionId)) return // the first state sync hasn't landed yet
+  const first = !announced
+  announced ??= new Set()
+  players.forEach((p, id) => {
+    if (id === net.sessionId || announced.has(id) || !p.username) return
+    announced.add(id)
+    if (first) playerInRoom(p.username)
+    else playerJoined(p.username)
+  })
+}
 
 // --- Connection --------------------------------------------------------------
 let sentPfp = '' // the profile picture the server shows the others (roster `pfp`)
 function attach(room) {
   net.room = room
   net.connected = true
+  announced = null
   for (const [type, fn] of handlers) room.onMessage(type, fn)
   room.onMessage('progress', (doc) => {
     net.hydrated = true
@@ -306,6 +329,7 @@ async function connect() {
 // Playtime ticks once a second while the tab is visible; a changed snapshot is sent at most every
 // NET.saveEvery s.
 setInterval(() => {
+  announcePlayers()
   if (document.hidden) return
   playtime += 1
   if (performance.now() - savedAt >= NET.saveEvery * 1000) saveNow()

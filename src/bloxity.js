@@ -2,7 +2,7 @@
 // here may throw when the SDK is missing: a blocked sdk.bloxity.io leaves the
 // game fully playable on the default avatar and keyboard controls.
 // Docs: https://docs.bloxity.io/#html5
-import { GAME_SLUG, GAME_TITLE, SETTINGS, DEV_MODE, coerceSetting } from './config.js'
+import { BOXITY_BOARDS, CHAT_BUBBLE, GAME_SLUG, GAME_TITLE, SETTINGS, DEV_MODE, coerceSetting } from './config.js'
 
 export function sdk() {
   if (DEV_MODE) return null
@@ -24,6 +24,7 @@ const proportionListeners = new Set()
 const authListeners = new Set()
 const settingListeners = new Set()
 const respawnListeners = new Set()
+const emoteListeners = new Set()
 const unsubscribers = []
 
 function emit(listeners, ...args) {
@@ -60,6 +61,11 @@ export function onSetting(fn) {
 export function onRespawnRequest(fn) {
   respawnListeners.add(fn)
   return () => respawnListeners.delete(fn)
+}
+// fn(id, clip) when the player picks an emote in Boxity's emote picker (only ids in the catalog).
+export function onEmote(fn) {
+  emoteListeners.add(fn)
+  return () => emoteListeners.delete(fn)
 }
 
 // --- Auth ---------------------------------------------------------------
@@ -145,6 +151,11 @@ export function init() {
     const onLocalhost = /^(localhost|127\.0\.0\.1)$/.test(window.location.hostname)
     SDK.init(onLocalhost ? { gameSlug: GAME_SLUG, portalUrl: 'https://bloxity.io' } : { gameSlug: GAME_SLUG })
     SDK.game.loadingStep(`Loading ${GAME_TITLE}`)
+    // On boot, not after loading: Boxity only shows its emote button for games that registered.
+    SDK.game.registerFeature?.('emotes')
+    loadEmotes()
+    // The boards the server reports to (backend boxityBoards.ts); declaring them shows the trophy button.
+    Promise.resolve(SDK.leaderboard?.define?.(BOXITY_BOARDS)).catch((err) => console.warn('[bloxity] leaderboard.define failed', err))
 
     for (const key of Object.keys(SETTINGS)) {
       const off = SDK.settings.listen(key, (raw) => {
@@ -181,8 +192,15 @@ export function init() {
     }
 
     unsubscribers.push(
-      SDK.player.onEvent((event) => {
+      SDK.player.onEvent((event, data) => {
         if (event === 'respawn_request') emit(respawnListeners)
+        else if (event === 'play_emote') {
+          // Boxity only sends emotes the player owns; an id missing from the catalog is ignored.
+          emotesLoaded.then(() => {
+            const clip = emoteClip(data)
+            if (clip) emit(emoteListeners, data, clip)
+          })
+        }
       }),
     )
 
@@ -230,6 +248,72 @@ export function teardown() {
     sdk()?.game.gameplayEnd()
   } catch {
     // Non-fatal.
+  }
+}
+
+// --- Emotes -----------------------------------------------------------------
+// The catalog ({apiUrl}/v1/avatar/emotes), fetched once at startup: id -> clip { len, loop, tracks }
+// (tracks: bone name -> [[s, xDeg, yDeg, zDeg], ...]). Remote players' emotes are looked up here too.
+const emotes = new Map()
+let emotesLoaded = Promise.resolve()
+function loadEmotes() {
+  let api = 'https://api.bloxity.io'
+  try {
+    api = sdk()?.environment?.()?.apiUrl || api
+  } catch {
+    // Older SDK builds have no environment().
+  }
+  emotesLoaded = fetch(`${api.replace(/\/$/, '')}/v1/avatar/emotes`)
+    .then((res) => (res.ok ? res.json() : null))
+    .then((data) => {
+      const list = Array.isArray(data) ? data : data?.emotes ?? data?.items ?? []
+      for (const e of list) if (e?.id && e.clip?.tracks && e.clip.len > 0) emotes.set(String(e.id), e.clip)
+    })
+    .catch((err) => console.warn('[bloxity] emote catalog failed to load', err))
+}
+export const emoteClip = (id) => (id && emotes.get(String(id))) || null
+
+// --- Chat bubbles + join toasts -----------------------------------------------------
+// fn({ userId, username, text, local }) for every Boxity chat message in this player's room (the
+// sender's own included); text is the SDK's two-line bubble text. Subscribing is the opt-in.
+export function onChatMessage(fn) {
+  try {
+    const SDK = sdk()
+    const off = SDK?.chat?.onMessage?.((m) => {
+      if (!m) return
+      let text = ''
+      try {
+        text = SDK.chat.bubbleText?.(m) ?? (m.isGif ? 'sent a GIF' : m.text)
+      } catch {
+        text = m.text
+      }
+      if (text) fn({ userId: String(m.userId ?? ''), username: String(m.username ?? ''), text: String(text), local: !!m.isLocalPlayer })
+    })
+    if (typeof off === 'function') unsubscribers.push(off)
+  } catch {
+    // No chat: no bubbles.
+  }
+}
+export function chatBubbleSeconds() {
+  try {
+    return sdk()?.chat?.bubbleSeconds || CHAT_BUBBLE.seconds
+  } catch {
+    return CHAT_BUBBLE.seconds
+  }
+}
+// Friend-join toasts: someone joined this player's room / was already in it when this player joined.
+export function playerJoined(username) {
+  try {
+    sdk()?.game?.playerJoined?.(username)
+  } catch {
+    // Ignore.
+  }
+}
+export function playerInRoom(username) {
+  try {
+    sdk()?.game?.playerInRoom?.(username)
+  } catch {
+    // Ignore.
   }
 }
 

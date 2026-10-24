@@ -36,6 +36,23 @@ export const NET = {
   detailRange: 90,
 }
 
+// --- Boxity platform features (bloxity.js) ------------------------------------------
+// Leaderboards on the game page and behind Boxity's trophy button. The server reports the scores
+// (backend boxityBoards.ts, which declares the same list: keep them in step by hand); the client
+// declares them because that is what shows the trophy button. The first declaration creates a
+// board and the Boxity dashboard owns it after that, so ids are permanent.
+export const BOXITY_BOARDS = [
+  { id: 'wins', label: 'Wins', order: 'desc', mode: 'latest', format: 'compact', reset: 'none' },
+  { id: 'power', label: 'Power', order: 'desc', mode: 'latest', format: 'compact', reset: 'none' },
+  { id: 'rebirths', label: 'Rebirths', order: 'desc', mode: 'best', format: 'number', reset: 'none' },
+]
+// Emotes from Boxity's emote picker, played on the rider (animator.js): blended in / out over these
+// s, stopped once the horse moves faster than `stopSpeed` m/s (or a race / the Trails scene starts).
+export const EMOTE = { blendIn: 0.1, blendOut: 0.2, stopSpeed: 0.6 }
+// Boxity chat bubbles (chatBubble.js): the sender's latest message over their head, `height` m tall,
+// `y` m above the horse's feet (remotes: just over the name tag), for Boxity's bubbleSeconds.
+export const CHAT_BUBBLE = { height: 0.9, y: 3.4, remoteY: 4.4, seconds: 4 }
+
 // --- World (metres: +X east, +Z south, +Y up) -------------------------------
 export const GROUND_Y = 0
 // The start island (world.js): one convex slab, a sunny plaza of cracked sand. Its front edge
